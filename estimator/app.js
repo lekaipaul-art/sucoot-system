@@ -328,9 +328,10 @@ async function submitRfq(event) {
     return;
   }
 
-  if (!client) {
+  if (!client || !navigator.onLine) {
     window.location.href = buildMailto(rfq);
-    showMessage(rfqMessage, "Online submission is not configured yet, so we opened an email draft to " + FALLBACK_EMAIL + " instead.", "info");
+    const reason = navigator.onLine ? "Online submission is not configured yet" : "You are offline";
+    showMessage(rfqMessage, reason + ", so we opened an email draft to " + FALLBACK_EMAIL + " instead.", "info");
     return;
   }
 
@@ -378,5 +379,59 @@ shoringForm.addEventListener("submit", function (event) { event.preventDefault()
 downloadButton.addEventListener("click", downloadCsv);
 rfqForm.addEventListener("submit", submitRfq);
 
+// ---- 可安裝成 App（PWA） ----
+const installButton = document.getElementById("install-button");
+const iosInstallHint = document.getElementById("ios-install-hint");
+const offlineBanner = document.getElementById("offline-banner");
+let deferredInstallPrompt = null;
+
+function isStandalone() {
+  return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+}
+
+function setupInstall() {
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js").catch(function () {
+      // 註冊失敗只影響離線功能，網頁本身照常運作。
+    });
+  }
+  if (isStandalone()) {
+    return;
+  }
+
+  // Android／桌面版 Chrome、Edge：攔下安裝提示，改由按鈕觸發。
+  window.addEventListener("beforeinstallprompt", function (event) {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    installButton.hidden = false;
+  });
+  installButton.addEventListener("click", async function () {
+    if (!deferredInstallPrompt) {
+      return;
+    }
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    installButton.hidden = true;
+  });
+  window.addEventListener("appinstalled", function () {
+    installButton.hidden = true;
+  });
+
+  // iPhone／iPad 的 Safari 沒有安裝提示，改顯示操作說明。
+  const ua = navigator.userAgent;
+  const isIos = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  iosInstallHint.hidden = !isIos;
+}
+
+function updateOnlineStatus() {
+  offlineBanner.hidden = navigator.onLine;
+}
+
+window.addEventListener("online", updateOnlineStatus);
+window.addEventListener("offline", updateOnlineStatus);
+
 document.getElementById("placeholder-banner").hidden = !calc.DATA.isPlaceholder;
+updateOnlineStatus();
+setupInstall();
 update();

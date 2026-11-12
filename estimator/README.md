@@ -44,3 +44,16 @@ python -m http.server 8000
 ```
 
 然後開啟 `http://localhost:8000/estimator/`。
+
+## 安裝成 App（PWA）
+
+估算器是可安裝的網頁 App（PWA），不需要上架 App Store 或 Google Play：
+
+- **Android（Chrome）／電腦版 Chrome、Edge**：開啟網頁後按頁首的「Install app」，或從瀏覽器選單選「安裝應用程式」。
+- **iPhone／iPad（Safari）**：點「分享」→「加入主畫面」。頁首會顯示這段英文說明。
+
+安裝後有獨立圖示、全螢幕開啟。沒有網路時仍可開啟和計算；送出詢價會改為開啟 email 草稿。
+
+相關檔案：`manifest.webmanifest`（App 名稱、圖示、顏色）、`sw.js`（離線快取）、`icons/`（`icon.svg` 為原始檔）。
+
+⚠️ 每次修改網站檔案後，請把 `sw.js` 裡的 `CACHE_VERSION` 加一（例如 `v1` → `v2`），已安裝的使用者才會拿到新版。
