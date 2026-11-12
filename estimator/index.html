@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1f4e78">
+  <meta name="description" content="Estimate a preliminary bill of materials for SUCOOT Ring Lock scaffolding and shoring towers, then send a quotation request.">
+  <title>Scaffolding Estimator | SUCOOT</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <p class="brand">SUCOOT <span>Ring Lock Systems</span></p>
+      <h1>Scaffolding Estimator</h1>
+      <p class="lead">Enter your project dimensions to get a preliminary bill of materials, total weight and container estimate — then send it to our engineers for a quotation.</p>
+    </div>
+  </header>
+
+  <div id="placeholder-banner" class="banner" hidden>
+    Prototype: component weights and load values are placeholders and must be replaced with SUCOOT engineering data before publishing.
+  </div>
+
+  <main class="layout">
+    <section class="panel inputs" aria-labelledby="step1-title">
+      <h2 id="step1-title"><span class="step">1</span>Choose a system</h2>
+      <div class="system-options" role="radiogroup" aria-label="Scaffolding system">
+        <label class="system-card">
+          <input type="radio" name="system" value="facade" checked>
+          <span class="system-name">Access / Facade Scaffolding</span>
+          <span class="system-desc">Ø48.6 Ring Lock · building facades, maintenance, working platforms</span>
+        </label>
+        <label class="system-card">
+          <input type="radio" name="system" value="shoring">
+          <span class="system-name">Shoring Towers (Heavy Duty)</span>
+          <span class="system-desc">Ø60.2 Ring Lock · slab and bridge falsework, high loads</span>
+        </label>
+      </div>
+
+      <h2 id="step2-title"><span class="step">2</span>Project dimensions</h2>
+
+      <form id="facade-form" class="dimension-form" novalidate>
+        <div class="field-row">
+          <div class="field">
+            <label for="facade-length">Wall length (m)</label>
+            <input id="facade-length" name="length" type="number" min="1" max="1000" step="0.1" value="30" required>
+          </div>
+          <div class="field">
+            <label for="facade-height">Height (m)</label>
+            <input id="facade-height" name="height" type="number" min="2" max="100" step="0.1" value="12" required>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="facade-bay">Bay length</label>
+            <select id="facade-bay" name="bayLength">
+              <option value="1.57">1.57 m</option>
+              <option value="2.07">2.07 m</option>
+              <option value="2.57" selected>2.57 m</option>
+              <option value="3.07">3.07 m</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="facade-width">Scaffold width</label>
+            <select id="facade-width" name="width">
+              <option value="0.73" selected>0.73 m (2 decks)</option>
+              <option value="1.09">1.09 m (3 decks)</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="facade-levels">Decked working levels</label>
+            <input id="facade-levels" name="workingLevels" type="number" min="1" max="50" step="1" value="2" required>
+          </div>
+          <div class="field checkbox-field">
+            <label><input id="facade-ties" name="wallTies" type="checkbox" checked> Include wall ties</label>
+          </div>
+        </div>
+      </form>
+
+      <form id="shoring-form" class="dimension-form" novalidate hidden>
+        <div class="field-row">
+          <div class="field">
+            <label for="shoring-length">Area length (m)</label>
+            <input id="shoring-length" name="areaLength" type="number" min="1" max="500" step="0.1" value="20" required>
+          </div>
+          <div class="field">
+            <label for="shoring-width">Area width (m)</label>
+            <input id="shoring-width" name="areaWidth" type="number" min="1" max="500" step="0.1" value="10" required>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="shoring-height">Floor to soffit (m)</label>
+            <input id="shoring-height" name="height" type="number" min="1.5" max="40" step="0.1" value="8" required>
+          </div>
+          <div class="field">
+            <label for="shoring-slab">Slab thickness (m)</label>
+            <input id="shoring-slab" name="slabThickness" type="number" min="0.1" max="3" step="0.05" value="0.3" required>
+          </div>
+        </div>
+        <p class="hint">Tower spacing is selected automatically from the slab load.</p>
+      </form>
+
+      <p id="input-message" class="message error" role="alert" hidden></p>
+    </section>
+
+    <section class="panel results" aria-labelledby="results-title" aria-live="polite">
+      <div class="results-header">
+        <h2 id="results-title">Estimated materials</h2>
+        <button id="download-button" type="button" class="secondary">Download CSV</button>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><span class="stat-label">Total weight</span><span id="stat-weight" class="stat-value">–</span></div>
+        <div class="stat"><span class="stat-label">Components</span><span id="stat-pieces" class="stat-value">–</span></div>
+        <div class="stat"><span class="stat-label">Containers</span><span id="stat-containers" class="stat-value">–</span></div>
+      </div>
+
+      <figure class="diagram">
+        <svg id="diagram" role="img" aria-labelledby="diagram-caption" viewBox="0 0 400 220" preserveAspectRatio="xMidYMid meet"></svg>
+        <figcaption id="diagram-caption">–</figcaption>
+      </figure>
+
+      <p id="design-note" class="design-note" hidden></p>
+
+      <div class="table-wrap">
+        <table class="bom">
+          <thead>
+            <tr><th scope="col">Item</th><th scope="col">Spec</th><th scope="col" class="num">Qty</th><th scope="col" class="num">Weight (kg)</th></tr>
+          </thead>
+          <tbody id="bom-body"></tbody>
+          <tfoot>
+            <tr><th scope="row" colspan="2">Total</th><td id="bom-total-qty" class="num">–</td><td id="bom-total-kg" class="num">–</td></tr>
+          </tfoot>
+        </table>
+      </div>
+      <p class="disclaimer">This is a preliminary estimate for budgeting only. Final quantities depend on site conditions and SUCOOT's structural calculation.</p>
+    </section>
+
+    <section class="panel rfq" aria-labelledby="step3-title">
+      <h2 id="step3-title"><span class="step">3</span>Request a quotation</h2>
+      <p class="hint">Your dimensions and the estimated materials above are attached automatically.</p>
+      <form id="rfq-form" novalidate>
+        <div class="field-row">
+          <div class="field">
+            <label for="company-name">Company name *</label>
+            <input id="company-name" name="company_name" type="text" maxlength="120" autocomplete="organization" required>
+          </div>
+          <div class="field">
+            <label for="country">Country *</label>
+            <input id="country" name="country" type="text" maxlength="80" autocomplete="country-name" required>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="contact-name">Contact person *</label>
+            <input id="contact-name" name="contact_name" type="text" maxlength="80" autocomplete="name" required>
+          </div>
+          <div class="field">
+            <label for="email">Email *</label>
+            <input id="email" name="email" type="email" maxlength="254" autocomplete="email" required>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="phone">Phone / WhatsApp</label>
+            <input id="phone" name="phone" type="tel" maxlength="40" autocomplete="tel">
+          </div>
+          <div class="field">
+            <label for="project-location">Project location</label>
+            <input id="project-location" name="project_location" type="text" maxlength="120" placeholder="City / project name">
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="request-type">What do you need?</label>
+            <select id="request-type" name="request_type">
+              <option value="quotation" selected>A quotation</option>
+              <option value="design">A design evaluation</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="needed-by">Needed on site by</label>
+            <input id="needed-by" name="needed_by" type="date">
+          </div>
+        </div>
+        <div class="field">
+          <label for="notes">Project details</label>
+          <textarea id="notes" name="notes" rows="4" maxlength="2000" placeholder="Structure type, loads, delivery port, anything else we should know"></textarea>
+        </div>
+        <div class="field honeypot" aria-hidden="true">
+          <label for="website">Website</label>
+          <input id="website" name="website" type="text" tabindex="-1" autocomplete="off">
+        </div>
+        <div class="field checkbox-field">
+          <label><input id="privacy-consent" name="privacy_consent" type="checkbox" required> I agree that SUCOOT may use these details to respond to my request. *</label>
+        </div>
+        <button id="rfq-submit" type="submit">Send quotation request</button>
+        <p id="rfq-message" class="message" role="status" aria-live="polite" hidden></p>
+      </form>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>SUCOOT CO., LTD. · Taichung, Taiwan · <a href="mailto:info.ws@sucoot.com">info.ws@sucoot.com</a> · <a href="https://www.sucoot.com">www.sucoot.com</a></p>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
+  <script src="../config.js"></script>
+  <script src="calc.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
