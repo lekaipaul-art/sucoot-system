@@ -94,6 +94,31 @@ body {
   color: #dbe6f1;
 }
 
+.install-area:has(:not([hidden])) {
+  margin-top: 16px;
+}
+
+.install-button {
+  background: #f0b64a;
+  border-color: #f0b64a;
+  color: #1d2733;
+}
+
+.install-button:hover:not(:disabled) {
+  background: #f5c86e;
+}
+
+.install-hint {
+  margin: 0;
+  color: #dbe6f1;
+  font-size: 0.92rem;
+}
+
+.banner.offline {
+  background: var(--info-bg);
+  color: var(--info-text);
+}
+
 .banner {
   max-width: 1120px;
   margin: 16px auto 0;
