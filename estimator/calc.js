@@ -21,13 +21,13 @@
     isPlaceholder: true,
     facade: {
       liftHeight: 2.0,          // 斜桿標準高度 2.0 m
-      jackAllowance: 0.3,       // 底座調整座伸出高度（可調 80–500 mm）
+      jackRange: [0.08, 0.5],   // Jack Base 可調範圍 80–500 mm（型錄 5.1）
       bracePerBays: 3,          // 每幾個跨距設一組斜桿（假設）
       tieSpacingH: 6.0,         // 壁連座水平間距（假設）
       tieSpacingV: 4.0,         // 壁連座垂直間距（假設）
       bayLengths: [0.9, 1.2, 1.5, 1.8, 2.4],
       widths: [0.9, 1.2],
-      // 立柱 Ø48.6 × t2.5 mm，STK500，環距 500 mm
+      // 立柱 Ø48.6 × t2.5 mm，STK500，環距 500 mm；sucoot.com 規格品長度 1.0／1.5／2.0／3.0 m
       verticals: {
         3.0: part(11.79, E),
         2.0: part(8.11, C),
@@ -83,14 +83,14 @@
     },
     shoring: {
       liftHeight: 1.5,          // 斜桿標準高度 1.5 m
-      jackAllowance: 0.6,       // 底座調整座 + U 型頂座伸出高度（各可調 80–450 mm）
+      jackRange: [0.16, 0.9],   // Jack Base + U-Head Jack 合計可調範圍（各 80–450 mm）
       socketLength: 0.2,        // Basic Socket V62020
       allowableLegKN: 45,       // 單支立柱容許荷重（kN）—假設值，需工程部提供
       concreteKNm3: 25,
       formworkKNm2: 1.0,
       liveKNm2: 2.5,
       spacings: [2.4, 1.8, 1.5, 1.2, 0.9, 0.6],
-      // 立柱 Ø60.2 × t3.2 mm（附接頭），環距 500 mm
+      // 立柱 Ø60.2 × t3.2 mm（附接頭），環距 500 mm；sucoot.com 規格品長度 1.0／1.5／2.0／3.0 m
       verticals: {
         3.0: part(18.3, E, { code: "V61300" }),
         2.0: part(12.6, E, { code: "V61200" }),
@@ -134,26 +134,52 @@
     return value.toFixed(1) + " m";
   }
 
-  // 依立柱需要的淨高，用最長的立柱為主，再補一支最短可涵蓋剩餘高度的立柱。
-  function splitVerticals(height, table) {
+  // 用規格品立柱組出每一支立柱位置的高度：
+  //   1. 立柱總長取 0.5 m 的倍數（所有規格品長度都是 0.5 m 的倍數），
+  //      讓剩下的高度落在調整座可調範圍內；
+  //   2. 在相同總長下，使用最少支數，支數相同時優先用長的立柱。
+  // height：要達到的高度；fixed：立柱以外的固定高度（例如 Basic Socket）；range：調整座可調範圍。
+  function planVerticalStack(height, table, fixed, range) {
+    const unit = 0.5;
     const lengths = Object.keys(table).map(Number).sort(function (a, b) { return b - a; });
-    const longest = lengths[0];
-    const shortOnes = lengths.slice(1).sort(function (a, b) { return a - b; });
+    const available = height - fixed;
+    let units = Math.floor((available - range[0]) / unit + 1e-9);
+    if (available - units * unit > range[1] + 1e-9) {
+      units += 1;
+    }
+    units = Math.max(units, Math.round(lengths[lengths.length - 1] / unit));
+    const stackLength = roundTo(units * unit, 2);
+    const extension = roundTo(Math.min(Math.max(available - stackLength, range[0]), range[1]), 2);
+
+    // 動態規劃：best[u] = 組出 u 個單位長度的最佳組合（支數最少，再比長立柱數量）。
+    const pieceUnits = lengths.map(function (len) { return Math.round(len / unit); });
+    const best = [[]];
+    for (let u = 1; u <= units; u++) {
+      let choice = null;
+      pieceUnits.forEach(function (pu, index) {
+        if (pu > u || !best[u - pu]) {
+          return;
+        }
+        const candidate = best[u - pu].concat(index).sort(function (x, y) { return x - y; });
+        if (!choice || candidate.length < choice.length ||
+            (candidate.length === choice.length && candidate.join() < choice.join())) {
+          choice = candidate;
+        }
+      });
+      best[u] = choice;
+    }
     const pieces = {};
-    let full = Math.floor(height / longest + 1e-9);
-    const remainder = roundTo(height - full * longest, 3);
-    if (remainder > 0) {
-      const fit = shortOnes.find(function (len) { return len >= remainder - 1e-9; });
-      if (fit) {
-        pieces[fit] = 1;
-      } else {
-        full += 1;
-      }
-    }
-    if (full > 0) {
-      pieces[longest] = full;
-    }
-    return pieces;
+    (best[units] || []).forEach(function (index) {
+      const len = lengths[index];
+      pieces[len] = (pieces[len] || 0) + 1;
+    });
+    return {
+      pieces: pieces,
+      sequence: (best[units] || []).map(function (index) { return lengths[index]; }),
+      stackLength: stackLength,
+      extension: extension,
+      topHeight: roundTo(fixed + stackLength + extension, 2)
+    };
   }
 
   function addItem(items, name, spec, qty, component) {
@@ -198,14 +224,12 @@
     }
   }
 
-  function addVerticals(items, columnHeight, table, legs, tube) {
-    const split = splitVerticals(columnHeight, table);
-    Object.keys(split).map(Number).sort(function (a, b) { return b - a; }).forEach(function (len) {
-      addItem(items, "Vertical", tube + " × " + lengthLabel(len), split[len] * legs, table[len]);
+  function addVerticals(items, stack, table, legs, tube) {
+    Object.keys(stack.pieces).map(Number).sort(function (a, b) { return b - a; }).forEach(function (len) {
+      addItem(items, "Vertical", tube + " × " + lengthLabel(len), stack.pieces[len] * legs, table[len]);
     });
   }
 
-  // 外牆／施工通道鷹架（Access / Facade, Ø48.6）。
   // Wall length ÷ Bay length：整跨數與餘數。
   function splitBays(length, bayLength) {
     const fullBays = Math.floor(length / bayLength + 1e-9);
@@ -347,7 +371,7 @@
     const levels = Math.min(Math.max(1, Math.round(input.workingLevels || 1)), lifts);
     const frames = bays + 1;
     const legs = frames * 2;
-    const columnHeight = Math.max(1, input.height - d.jackAllowance);
+    const stack = planVerticalStack(input.height, d.verticals, 0, d.jackRange);
     const braceBay = bayGroups[0].length;
     const braceSets = Math.max(1, Math.ceil(bayGroups[0].count / d.bracePerBays));
     const layout = d.deckLayout[input.width];
@@ -356,7 +380,7 @@
 
     const items = [];
     addItem(items, "Jack Base", "Ø38.5 × t4.0 × 600 mm", legs, d.jackBase);
-    addVerticals(items, columnHeight, d.verticals, legs, tube);
+    addVerticals(items, stack, d.verticals, legs, tube);
     bayGroups.forEach(function (group) {
       addItem(items, "Horizontal (bay)", rail + " × " + lengthLabel(group.length),
         2 * group.count * (lifts + 1) + group.count * levels, d.horizontals[group.length]);
@@ -383,6 +407,7 @@
 
     return Object.assign({ ok: true, errors: [] }, summarize(items, {
       system: "facade",
+      verticalStack: stack,
       split: { fullBays: plan.fullBays, remainder: plan.remainder },
       layout: { fullBays: fullBays, fillers: fillers, covered: coveredLength, difference: roundTo(coveredLength - input.length, 2) },
       geometry: {
@@ -425,8 +450,8 @@
     const nx = Math.ceil(input.areaLength / spacing - 1e-9) + 1;
     const ny = Math.ceil(input.areaWidth / spacing - 1e-9) + 1;
     const legs = nx * ny;
-    const columnHeight = Math.max(1, input.height - d.jackAllowance - d.socketLength);
-    const lifts = Math.ceil(columnHeight / d.liftHeight - 1e-9);
+    const stack = planVerticalStack(input.height, d.verticals, d.socketLength, d.jackRange);
+    const lifts = Math.ceil(stack.stackLength / d.liftHeight - 1e-9);
     const horizontalCount = ((nx - 1) * ny + (ny - 1) * nx) * (lifts + 1);
     const perimeterBays = 2 * (nx - 1) + 2 * (ny - 1);
     const innerLines = Math.floor((ny - 2) / 3);
@@ -437,13 +462,14 @@
     const items = [];
     addItem(items, "Jack Base", "Ø48.2 × t5.0 × 600 mm", legs, d.jackBase);
     addItem(items, "Basic Socket", tube + " × 0.2 m", legs, d.basicSocket);
-    addVerticals(items, columnHeight, d.verticals, legs, tube);
+    addVerticals(items, stack, d.verticals, legs, tube);
     addItem(items, "Horizontal", rail + " × " + lengthLabel(spacing), horizontalCount, d.horizontals[spacing]);
     addItem(items, "Diagonal", rail + ", " + spacing.toFixed(1) + " × " + d.liftHeight.toFixed(1) + " m", diagonalCount, d.diagonals[spacing]);
     addItem(items, "U-Head Jack", "Ø48.2 × t5.0 × 600 mm", legs, d.uHead);
 
     return Object.assign({ ok: true, errors: [] }, summarize(items, {
       system: "shoring",
+      verticalStack: stack,
       geometry: { nx: nx, ny: ny, spacing: spacing, lifts: lifts, height: input.height },
       design: {
         loadKNm2: loadKNm2,
@@ -469,7 +495,7 @@
     }).join("\r\n");
   }
 
-  const api = { DATA: DATA, splitBays: splitBays, planBays: planBays, estimateFacade: estimateFacade, estimateShoring: estimateShoring, toCsv: toCsv };
+  const api = { DATA: DATA, splitBays: splitBays, planBays: planBays, planVerticalStack: planVerticalStack, estimateFacade: estimateFacade, estimateShoring: estimateShoring, toCsv: toCsv };
   if (typeof module === "object" && module.exports) {
     module.exports = api;
   } else {
