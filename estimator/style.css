@@ -144,27 +144,39 @@ body {
   gap: 16px;
   grid-template-columns: 1fr;
   grid-template-areas:
-    "inputs"
+    "system"
+    "dimensions"
     "results"
     "rfq";
 }
 
 @media (min-width: 900px) {
   .layout {
-    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     grid-template-areas:
-      "inputs results"
-      "rfq results";
+      "system dimensions"
+      "results results"
+      "rfq rfq";
+  }
+
+  .results-body {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    gap: 20px;
     align-items: start;
   }
 
-  .results {
-    position: sticky;
-    top: 16px;
+  .results-body .diagram {
+    margin-bottom: 0;
+  }
+
+  .results-body .design-note {
+    margin: 12px 0 0;
   }
 }
 
-.inputs { grid-area: inputs; }
+.system { grid-area: system; }
+.dimensions { grid-area: dimensions; }
 .results { grid-area: results; }
 .rfq { grid-area: rfq; }
 
@@ -182,10 +194,6 @@ h2 {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-#step2-title {
-  margin-top: 22px;
 }
 
 .step {
@@ -206,20 +214,26 @@ h2 {
 }
 
 .system-card {
-  position: relative;
   display: grid;
-  gap: 2px;
-  padding: 12px 14px 12px 42px;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 12px;
+  row-gap: 2px;
+  padding: 12px 14px;
   border: 1px solid var(--border);
   border-radius: 10px;
   cursor: pointer;
 }
 
 .system-card input {
-  position: absolute;
-  left: 14px;
-  top: 15px;
+  grid-row: 1 / span 2;
+  align-self: start;
+  margin: 5px 0 0;
   accent-color: var(--primary);
+}
+
+.system-card .system-name,
+.system-card .system-desc {
+  grid-column: 2;
 }
 
 .system-card:has(input:checked) {
@@ -555,4 +569,27 @@ button.secondary:hover:not(:disabled) {
 .badge.custom {
   background: var(--banner-bg);
   color: var(--banner-text);
+}
+
+.stat-sub {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+@media (min-width: 900px) {
+  .system {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .system-options {
+    flex: 1;
+    grid-auto-rows: 1fr;
+  }
+
+  .system-card {
+    align-content: center;
+  }
 }

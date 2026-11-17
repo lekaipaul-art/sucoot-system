@@ -115,7 +115,10 @@ function renderEmpty() {
 function renderResult(result) {
   statWeight.textContent = numberFormat.format(result.totalKg / 1000) + " t";
   statPieces.textContent = result.totalPieces.toLocaleString("en-US") + " pcs";
-  statContainers.textContent = result.containers20 + " × 20′ or " + result.containers40 + " × 40′";
+  const alt = document.createElement("span");
+  alt.className = "stat-sub";
+  alt.textContent = "or " + result.containers40 + " × 40′";
+  statContainers.replaceChildren(result.containers20 + " × 20′", alt);
   downloadButton.disabled = false;
 
   const rows = result.items.map(function (item) {

@@ -37,7 +37,7 @@
   </div>
 
   <main class="layout">
-    <section class="panel inputs" aria-labelledby="step1-title">
+    <section class="panel system" aria-labelledby="step1-title">
       <h2 id="step1-title"><span class="step">1</span>Choose a system</h2>
       <div class="system-options" role="radiogroup" aria-label="Scaffolding system">
         <label class="system-card">
@@ -51,7 +51,9 @@
           <span class="system-desc">Ø60.2 × t3.2 verticals · Ø48.6 horizontals · 1.5 m lifts</span>
         </label>
       </div>
+    </section>
 
+    <section class="panel dimensions" aria-labelledby="step2-title">
       <h2 id="step2-title"><span class="step">2</span>Project dimensions</h2>
 
       <form id="facade-form" class="dimension-form" novalidate>
@@ -128,6 +130,8 @@
         <button id="download-button" type="button" class="secondary">Download CSV</button>
       </div>
 
+      <div class="results-body">
+      <div class="results-visual">
       <div class="stats">
         <div class="stat"><span class="stat-label">Total weight</span><span id="stat-weight" class="stat-value">–</span></div>
         <div class="stat"><span class="stat-label">Components</span><span id="stat-pieces" class="stat-value">–</span></div>
@@ -140,6 +144,9 @@
       </figure>
 
       <p id="design-note" class="design-note" hidden></p>
+      </div>
+
+      <div class="results-table">
 
       <div class="table-wrap">
         <table class="bom">
@@ -154,6 +161,8 @@
       </div>
       <p id="bom-legend" class="disclaimer" hidden></p>
       <p class="disclaimer">This is a preliminary estimate for budgeting only. Final quantities depend on site conditions and SUCOOT's structural calculation.</p>
+      </div>
+      </div>
     </section>
 
     <section class="panel rfq" aria-labelledby="step3-title">
