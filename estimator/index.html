@@ -33,7 +33,7 @@
   </div>
 
   <div id="placeholder-banner" class="banner" hidden>
-    Prototype: component weights and load values are placeholders and must be replaced with SUCOOT engineering data before publishing.
+    Prototype: component sizes follow the SUCOOT 2026 catalogs. Weights marked “est.”, the leg load capacity and container loads are still estimates awaiting SUCOOT engineering data.
   </div>
 
   <main class="layout">
@@ -43,12 +43,12 @@
         <label class="system-card">
           <input type="radio" name="system" value="facade" checked>
           <span class="system-name">Access / Facade Scaffolding</span>
-          <span class="system-desc">Ø48.6 Ring Lock · building facades, maintenance, working platforms</span>
+          <span class="system-desc">Ø48.6 × t2.5 verticals · Ø42.7 horizontals · 2.0 m lifts</span>
         </label>
         <label class="system-card">
           <input type="radio" name="system" value="shoring">
           <span class="system-name">Shoring Towers (Heavy Duty)</span>
-          <span class="system-desc">Ø60.2 Ring Lock · slab and bridge falsework, high loads</span>
+          <span class="system-desc">Ø60.2 × t3.2 verticals · Ø48.6 horizontals · 1.5 m lifts</span>
         </label>
       </div>
 
@@ -67,19 +67,20 @@
         </div>
         <div class="field-row">
           <div class="field">
-            <label for="facade-bay">Bay length</label>
+            <label for="facade-bay">Bay length (horizontal)</label>
             <select id="facade-bay" name="bayLength">
-              <option value="1.57">1.57 m</option>
-              <option value="2.07">2.07 m</option>
-              <option value="2.57" selected>2.57 m</option>
-              <option value="3.07">3.07 m</option>
+              <option value="0.9">0.9 m</option>
+              <option value="1.2">1.2 m</option>
+              <option value="1.5">1.5 m</option>
+              <option value="1.8" selected>1.8 m</option>
+              <option value="2.4">2.4 m</option>
             </select>
           </div>
           <div class="field">
-            <label for="facade-width">Scaffold width</label>
+            <label for="facade-width">Scaffold width (horizontal)</label>
             <select id="facade-width" name="width">
-              <option value="0.73" selected>0.73 m (2 decks)</option>
-              <option value="1.09">1.09 m (3 decks)</option>
+              <option value="0.9" selected>0.9 m (550 + 265 planks)</option>
+              <option value="1.2">1.2 m (2 × 550 planks)</option>
             </select>
           </div>
         </div>
@@ -115,7 +116,7 @@
             <input id="shoring-slab" name="slabThickness" type="number" min="0.1" max="3" step="0.05" value="0.3" required>
           </div>
         </div>
-        <p class="hint">Tower spacing is selected automatically from the slab load.</p>
+        <p class="hint">The horizontal length (vertical spacing: 0.6 – 2.4 m) is selected automatically from the slab load.</p>
       </form>
 
       <p id="input-message" class="message error" role="alert" hidden></p>
@@ -151,6 +152,7 @@
           </tfoot>
         </table>
       </div>
+      <p id="bom-legend" class="disclaimer" hidden></p>
       <p class="disclaimer">This is a preliminary estimate for budgeting only. Final quantities depend on site conditions and SUCOOT's structural calculation.</p>
     </section>
 
