@@ -19,6 +19,7 @@ const designNote = document.getElementById("design-note");
 const bomBody = document.getElementById("bom-body");
 const bomTotalQty = document.getElementById("bom-total-qty");
 const bomTotalKg = document.getElementById("bom-total-kg");
+const bomLegend = document.getElementById("bom-legend");
 const downloadButton = document.getElementById("download-button");
 const rfqForm = document.getElementById("rfq-form");
 const rfqSubmit = document.getElementById("rfq-submit");
@@ -107,6 +108,7 @@ function renderEmpty() {
   diagram.replaceChildren();
   diagramCaption.textContent = "–";
   designNote.hidden = true;
+  bomLegend.hidden = true;
   downloadButton.disabled = true;
 }
 
@@ -121,27 +123,55 @@ function renderResult(result) {
     const nameCell = document.createElement("td");
     const name = document.createElement("span");
     name.textContent = item.name;
-    const code = document.createElement("span");
-    code.className = "code";
-    code.textContent = item.code;
-    nameCell.append(name, code);
-    row.append(nameCell, cell(item.spec), cell(item.qty.toLocaleString("en-US"), "num"), cell(numberFormat.format(item.totalKg), "num"));
+    nameCell.append(name);
+    if (item.code) {
+      const code = document.createElement("span");
+      code.className = "code";
+      code.textContent = item.code;
+      nameCell.append(code);
+    }
+    const specCell = cell(item.spec);
+    if (item.custom) {
+      specCell.append(badge("custom", "Custom size"));
+    }
+    const weightCell = cell(numberFormat.format(item.totalKg), "num");
+    if (item.weightSource === "estimate") {
+      weightCell.append(badge("est", "est."));
+    }
+    row.append(nameCell, specCell, cell(item.qty.toLocaleString("en-US"), "num"), weightCell);
     return row;
   });
   bomBody.replaceChildren.apply(bomBody, rows);
   bomTotalQty.textContent = result.totalPieces.toLocaleString("en-US");
   bomTotalKg.textContent = numberFormat.format(result.totalKg);
 
+  const legend = [];
+  if (result.hasEstimates) {
+    legend.push("“est.” = unit weight not listed in the catalog; estimated from similar components.");
+  }
+  if (result.hasCustom) {
+    legend.push("“Custom size” = not a standard catalog size for this bay length; available on request.");
+  }
+  bomLegend.textContent = legend.join(" ");
+  bomLegend.hidden = legend.length === 0;
+
   if (result.system === "shoring") {
     drawShoring(result.geometry);
     const design = result.design;
-    designNote.textContent = "Design load " + design.loadKNm2 + " kN/m² → tower spacing " + result.geometry.spacing +
-      " m, about " + design.legLoadKN + " kN per leg (" + design.utilization + "% of the assumed " + design.allowableLegKN + " kN capacity).";
+    designNote.textContent = "Design load " + design.loadKNm2 + " kN/m² → " + result.geometry.spacing.toFixed(1) +
+      " m horizontals, about " + design.legLoadKN + " kN per vertical (" + design.utilization + "% of the assumed " + design.allowableLegKN + " kN capacity).";
     designNote.hidden = false;
   } else {
     drawFacade(result.geometry);
     designNote.hidden = true;
   }
+}
+
+function badge(className, text) {
+  const span = document.createElement("span");
+  span.className = "badge " + className;
+  span.textContent = text;
+  return span;
 }
 
 function cell(text, className) {
@@ -195,8 +225,8 @@ function drawFacade(g) {
   diagram.replaceChildren.apply(diagram, parts);
 
   const clipped = g.bays > MAX_DRAWN ? " (first " + MAX_DRAWN + " bays shown)" : "";
-  diagramCaption.textContent = "Elevation: " + g.bays + " bays × " + g.bayLength + " m, " + g.lifts +
-    " lifts × " + g.liftHeight + " m, " + g.levels + " decked level(s)" + clipped + ".";
+  diagramCaption.textContent = "Elevation: " + g.bays + " bays × " + g.bayLength.toFixed(1) + " m, " + g.lifts +
+    " lifts × " + g.liftHeight.toFixed(1) + " m, " + g.levels + " decked level(s)" + clipped + ".";
 }
 
 // 支撐架平面圖：立柱格點與兩向橫桿。
@@ -225,7 +255,7 @@ function drawShoring(g) {
   diagram.replaceChildren.apply(diagram, parts);
 
   const clipped = g.nx > MAX_DRAWN || g.ny > MAX_DRAWN ? " (partly shown)" : "";
-  diagramCaption.textContent = "Plan: " + g.nx + " × " + g.ny + " legs at " + g.spacing + " m spacing, " +
+  diagramCaption.textContent = "Plan: " + g.nx + " × " + g.ny + " verticals at " + g.spacing.toFixed(1) + " m spacing, " +
     g.lifts + " lifts" + clipped + ".";
 }
 
