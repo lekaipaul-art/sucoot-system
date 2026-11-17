@@ -1,6 +1,6 @@
 // Service worker：讓估算器可安裝成 App，並在離線時仍能開啟與計算。
 // 每次修改網站檔案後，請把 CACHE_VERSION 加一，使用者才會拿到新版。
-const CACHE_VERSION = "v4";
+const CACHE_VERSION = "v5";
 const CACHE_NAME = "sucoot-estimator-" + CACHE_VERSION;
 
 const APP_SHELL = [
