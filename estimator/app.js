@@ -250,7 +250,7 @@ function renderResult(result) {
 function describeVerticalStack(stack, system) {
   const pieces = stack.sequence.map(function (len) { return len.toFixed(1); }).join(" + ");
   const jacks = system === "shoring" ? "Basic Socket 0.2 m + jacks " : "Jack Base ";
-  return "Each vertical line: " + pieces + " m verticals + " + jacks + formatMeters(stack.extension) +
+  return "Each vertical line (bottom → top): " + pieces + " m verticals + " + jacks + formatMeters(stack.extension) +
     " = " + formatMeters(stack.topHeight) + ".";
 }
 
