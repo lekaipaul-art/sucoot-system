@@ -20,6 +20,10 @@ const bomBody = document.getElementById("bom-body");
 const bomTotalQty = document.getElementById("bom-total-qty");
 const bomTotalKg = document.getElementById("bom-total-kg");
 const bomLegend = document.getElementById("bom-legend");
+const baySplitText = document.getElementById("bay-split-text");
+const remainderField = document.getElementById("remainder-field");
+const remainderSelect = document.getElementById("facade-remainder-bay");
+let remainderKey = "";
 const downloadButton = document.getElementById("download-button");
 const rfqForm = document.getElementById("rfq-form");
 const rfqSubmit = document.getElementById("rfq-submit");
@@ -66,7 +70,7 @@ function readInputs(system) {
       slabThickness: Number(shoringForm.slabThickness.value)
     };
   }
-  return {
+  const inputs = {
     length: Number(facadeForm.length.value),
     height: Number(facadeForm.height.value),
     bayLength: Number(facadeForm.bayLength.value),
@@ -74,6 +78,59 @@ function readInputs(system) {
     workingLevels: Number(facadeForm.workingLevels.value),
     wallTies: facadeForm.wallTies.checked
   };
+  if (!remainderField.hidden) {
+    inputs.remainderBay = Number(remainderSelect.value);
+  }
+  return inputs;
+}
+
+const meterFormat = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
+
+function formatMeters(value) {
+  return meterFormat.format(value) + " m";
+}
+
+// Wall length ÷ Bay length：顯示整跨數與餘數；有餘數時顯示「餘數」欄位。
+// 牆長或跨距改變時，餘數欄位重新帶入建議的 Horizontal 長度。
+function updateBaySplit() {
+  const length = Number(facadeForm.length.value);
+  const bay = Number(facadeForm.bayLength.value);
+  if (!Number.isFinite(length) || length <= 0) {
+    baySplitText.textContent = "–";
+    remainderField.hidden = true;
+    return;
+  }
+
+  const split = calc.splitBays(length, bay);
+  const bayWord = split.fullBays === 1 ? " bay" : " bays";
+  if (split.remainder === 0) {
+    baySplitText.textContent = formatMeters(length) + " ÷ " + formatMeters(bay) + " = " + split.fullBays + bayWord + ", no remainder";
+    remainderField.hidden = true;
+    remainderKey = "";
+    return;
+  }
+
+  baySplitText.textContent = formatMeters(length) + " ÷ " + formatMeters(bay) + " = " + split.fullBays + bayWord +
+    ", remainder " + formatMeters(split.remainder);
+  const key = length + "|" + bay;
+  if (key !== remainderKey) {
+    const options = split.options.map(function (len) {
+      const option = document.createElement("option");
+      option.value = String(len);
+      option.textContent = formatMeters(len) + (len === split.suggested ? " (suggested)" : "");
+      return option;
+    });
+    if (split.fullBays > 0) {
+      const none = document.createElement("option");
+      none.value = "0";
+      none.textContent = "No extra bay (covers " + formatMeters(split.fullBays * bay) + ")";
+      options.push(none);
+    }
+    remainderSelect.replaceChildren.apply(remainderSelect, options);
+    remainderSelect.value = String(split.suggested);
+    remainderKey = key;
+  }
+  remainderField.hidden = false;
 }
 
 function update() {
@@ -81,6 +138,9 @@ function update() {
   facadeForm.hidden = system !== "facade";
   shoringForm.hidden = system !== "shoring";
 
+  if (system === "facade") {
+    updateBaySplit();
+  }
   const inputs = readInputs(system);
   const result = system === "shoring" ? calc.estimateShoring(inputs) : calc.estimateFacade(inputs);
 
@@ -196,29 +256,46 @@ function svgEl(name, attrs) {
 
 // 外牆架立面圖：跨距 × 步數，最上方的工作層畫踏板，部分跨距畫斜撐。
 function drawFacade(g) {
-  const bays = Math.min(g.bays, MAX_DRAWN);
+  // 依實際長度畫每一跨；餘數跨畫在最右側並加底色標示。
+  const hasRemainder = g.remainderBay > 0;
+  const drawnFull = Math.min(g.fullBays, MAX_DRAWN - (hasRemainder ? 1 : 0));
+  const bayWidths = [];
+  for (let i = 0; i < drawnFull; i++) {
+    bayWidths.push(g.bayLength);
+  }
+  if (hasRemainder) {
+    bayWidths.push(g.remainderBay);
+  }
+  const drawnLength = bayWidths.reduce(function (sum, w) { return sum + w; }, 0);
   const width = 360;
   const height = 190;
-  const unitX = width / bays;
+  const scale = width / drawnLength;
   const unitY = height / g.lifts;
   const left = 20;
   const top = 15;
   const parts = [];
+  const xs = [left];
+  bayWidths.forEach(function (w) {
+    xs.push(xs[xs.length - 1] + w * scale);
+  });
 
-  parts.push(svgEl("line", { x1: 0, y1: top + height + 2, x2: 400, y2: top + height + 2, class: "ground" }));
-  for (let i = 0; i <= bays; i++) {
-    const x = left + i * unitX;
-    parts.push(svgEl("line", { x1: x, y1: top, x2: x, y2: top + height, class: "standard" }));
+  if (hasRemainder) {
+    const x = xs[xs.length - 2];
+    parts.push(svgEl("rect", { x: x, y: top, width: xs[xs.length - 1] - x, height: height, class: "remainder-bay" }));
   }
+  parts.push(svgEl("line", { x1: 0, y1: top + height + 2, x2: 400, y2: top + height + 2, class: "ground" }));
+  xs.forEach(function (x) {
+    parts.push(svgEl("line", { x1: x, y1: top, x2: x, y2: top + height, class: "standard" }));
+  });
   for (let j = 0; j <= g.lifts; j++) {
     const y = top + j * unitY;
     parts.push(svgEl("line", { x1: left, y1: y, x2: left + width, y2: y, class: "ledger" }));
   }
+  const bracedBays = drawnFull > 0 ? drawnFull : bayWidths.length;
   for (let j = 0; j < g.lifts; j++) {
-    for (let i = 0; i < bays; i += 3) {
-      const x = left + i * unitX;
+    for (let i = 0; i < bracedBays; i += 3) {
       const y = top + j * unitY;
-      parts.push(svgEl("line", { x1: x, y1: y + unitY, x2: x + unitX, y2: y, class: "diagonal" }));
+      parts.push(svgEl("line", { x1: xs[i], y1: y + unitY, x2: xs[i + 1], y2: y, class: "diagonal" }));
     }
   }
   for (let level = 0; level < g.levels; level++) {
@@ -227,9 +304,16 @@ function drawFacade(g) {
   }
   diagram.replaceChildren.apply(diagram, parts);
 
-  const clipped = g.bays > MAX_DRAWN ? " (first " + MAX_DRAWN + " bays shown)" : "";
-  diagramCaption.textContent = "Elevation: " + g.bays + " bays × " + g.bayLength.toFixed(1) + " m, " + g.lifts +
-    " lifts × " + g.liftHeight.toFixed(1) + " m, " + g.levels + " decked level(s)" + clipped + ".";
+  let text = "Elevation: " + g.fullBays + " × " + g.bayLength.toFixed(1) + " m";
+  if (hasRemainder) {
+    text += " + 1 × " + g.remainderBay.toFixed(1) + " m remainder bay (shaded)";
+  }
+  text += " = " + formatMeters(g.coveredLength) + ", " + g.lifts + " lifts × " + g.liftHeight.toFixed(1) +
+    " m, " + g.levels + " decked level(s)";
+  if (g.fullBays > drawnFull) {
+    text += " (" + drawnFull + " full bays drawn)";
+  }
+  diagramCaption.textContent = text + ".";
 }
 
 // 支撐架平面圖：立柱格點與兩向橫桿。
