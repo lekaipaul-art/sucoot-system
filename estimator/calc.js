@@ -160,6 +160,12 @@
     if (qty <= 0) {
       return;
     }
+    const existing = items.find(function (item) { return item.name === name && item.spec === spec; });
+    if (existing) {
+      existing.qty += qty;
+      existing.totalKg = roundTo(existing.qty * existing.unitKg, 1);
+      return;
+    }
     items.push({
       code: component.code || "",
       name: name,
@@ -200,6 +206,21 @@
   }
 
   // 外牆／施工通道鷹架（Access / Facade, Ø48.6）。
+  // Wall length ÷ Bay length：整跨數與餘數，並建議餘數那一跨使用的 Horizontal 長度。
+  function splitBays(length, bayLength) {
+    const d = DATA.facade;
+    const fullBays = Math.floor(length / bayLength + 1e-9);
+    const remainder = roundTo(length - fullBays * bayLength, 2);
+    if (remainder <= 0.005) {
+      return { fullBays: fullBays, remainder: 0, options: [], suggested: 0 };
+    }
+    const options = d.bayLengths.filter(function (len) { return len <= bayLength + 1e-9; });
+    const fit = options.find(function (len) { return len >= remainder - 1e-9; });
+    return { fullBays: fullBays, remainder: remainder, options: options, suggested: fit || bayLength };
+  }
+
+  // 外牆／施工通道鷹架（Access / Facade, Ø48.6）。
+  // input.remainderBay：餘數那一跨的 Horizontal 長度；0 表示不加這一跨。
   function estimateFacade(input) {
     const d = DATA.facade;
     const errors = [];
@@ -216,13 +237,33 @@
     }
 
     const bay = input.bayLength;
+    const split = splitBays(input.length, bay);
+    let remainderBay = 0;
+    if (split.remainder > 0) {
+      remainderBay = input.remainderBay === undefined ? split.suggested : Number(input.remainderBay);
+      if (remainderBay !== 0 && split.options.indexOf(remainderBay) === -1) {
+        return { ok: false, errors: ["Remainder bay length is not supported."] };
+      }
+    }
+    const bayGroups = [];
+    if (split.fullBays > 0) {
+      bayGroups.push({ length: bay, count: split.fullBays });
+    }
+    if (remainderBay > 0) {
+      bayGroups.push({ length: remainderBay, count: 1 });
+    }
+    if (!bayGroups.length) {
+      return { ok: false, errors: ["The wall is shorter than one bay. Please choose a remainder bay length."] };
+    }
+
+    const bays = split.fullBays + (remainderBay > 0 ? 1 : 0);
     const lifts = Math.ceil(input.height / d.liftHeight - 1e-9);
     const levels = Math.min(Math.max(1, Math.round(input.workingLevels || 1)), lifts);
-    const bays = Math.ceil(input.length / bay - 1e-9);
     const frames = bays + 1;
     const legs = frames * 2;
     const columnHeight = Math.max(1, input.height - d.jackAllowance);
-    const braceSets = Math.max(1, Math.ceil(bays / d.bracePerBays));
+    const braceBay = bayGroups[0].length;
+    const braceSets = Math.max(1, Math.ceil(bayGroups[0].count / d.bracePerBays));
     const layout = d.deckLayout[input.width];
     const tube = "Ø48.6 × t2.5";
     const rail = "Ø42.7 × t2.3";
@@ -230,18 +271,25 @@
     const items = [];
     addItem(items, "Jack Base", "Ø38.5 × t4.0 × 600 mm", legs, d.jackBase);
     addVerticals(items, columnHeight, d.verticals, legs, tube);
-    addItem(items, "Horizontal (bay)", rail + " × " + lengthLabel(bay),
-      2 * bays * (lifts + 1) + bays * levels, d.horizontals[bay]);
+    bayGroups.forEach(function (group) {
+      addItem(items, "Horizontal (bay)", rail + " × " + lengthLabel(group.length),
+        2 * group.count * (lifts + 1) + group.count * levels, d.horizontals[group.length]);
+    });
     addItem(items, "Horizontal (width)", rail + " × " + lengthLabel(input.width),
       frames * (lifts + 1), d.horizontals[input.width]);
-    addItem(items, "Diagonal", rail + ", " + bay.toFixed(1) + " × " + d.liftHeight.toFixed(1) + " m",
-      braceSets * lifts, d.diagonals[bay]);
-    addItem(items, "Plank", "550 × " + Math.round(bay * 1000) + " mm",
-      layout.planks * bays * levels, d.planks[bay]);
-    addItem(items, "Side Plank", "265 × " + Math.round(bay * 1000) + " mm",
-      layout.sidePlanks * bays * levels, d.sidePlanks[bay]);
-    addItem(items, "Toe Board", "Aluminum, " + lengthLabel(bay),
-      bays * levels, d.toeBoards[bay]);
+    addItem(items, "Diagonal", rail + ", " + braceBay.toFixed(1) + " × " + d.liftHeight.toFixed(1) + " m",
+      braceSets * lifts, d.diagonals[braceBay]);
+    bayGroups.forEach(function (group) {
+      addItem(items, "Plank", "550 × " + Math.round(group.length * 1000) + " mm",
+        layout.planks * group.count * levels, d.planks[group.length]);
+    });
+    bayGroups.forEach(function (group) {
+      addItem(items, "Side Plank", "265 × " + Math.round(group.length * 1000) + " mm",
+        layout.sidePlanks * group.count * levels, d.sidePlanks[group.length]);
+    });
+    bayGroups.forEach(function (group) {
+      addItem(items, "Toe Board", "Aluminum, " + lengthLabel(group.length), group.count * levels, d.toeBoards[group.length]);
+    });
     if (input.wallTies) {
       addItem(items, "Wall Tie", "Site specific",
         (Math.ceil(input.length / d.tieSpacingH) + 1) * Math.ceil(input.height / d.tieSpacingV), d.wallTie);
@@ -249,7 +297,18 @@
 
     return Object.assign({ ok: true, errors: [] }, summarize(items, {
       system: "facade",
-      geometry: { bays: bays, lifts: lifts, levels: levels, bayLength: bay, liftHeight: d.liftHeight, height: input.height }
+      split: { fullBays: split.fullBays, remainder: split.remainder, remainderBay: remainderBay },
+      geometry: {
+        bays: bays,
+        fullBays: split.fullBays,
+        remainderBay: remainderBay,
+        lifts: lifts,
+        levels: levels,
+        bayLength: bay,
+        coveredLength: roundTo(split.fullBays * bay + remainderBay, 2),
+        liftHeight: d.liftHeight,
+        height: input.height
+      }
     }));
   }
 
@@ -322,7 +381,7 @@
     }).join("\r\n");
   }
 
-  const api = { DATA: DATA, estimateFacade: estimateFacade, estimateShoring: estimateShoring, toCsv: toCsv };
+  const api = { DATA: DATA, splitBays: splitBays, estimateFacade: estimateFacade, estimateShoring: estimateShoring, toCsv: toCsv };
   if (typeof module === "object" && module.exports) {
     module.exports = api;
   } else {

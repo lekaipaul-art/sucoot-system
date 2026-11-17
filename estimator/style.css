@@ -50,6 +50,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -592,4 +596,26 @@ button.secondary:hover:not(:disabled) {
   .system-card {
     align-content: center;
   }
+}
+
+.bay-split {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--info-bg);
+}
+
+.bay-split-text {
+  margin: 0;
+  font-size: 0.92rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.remainder-field {
+  margin: 10px 0 0;
+}
+
+.diagram .remainder-bay {
+  fill: var(--accent);
+  opacity: 0.18;
 }
