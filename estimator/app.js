@@ -233,16 +233,25 @@ function renderResult(result) {
   bomLegend.textContent = legend.join(" ");
   bomLegend.hidden = legend.length === 0;
 
+  const stackText = describeVerticalStack(result.verticalStack, result.system);
   if (result.system === "shoring") {
     drawShoring(result.geometry);
     const design = result.design;
-    designNote.textContent = "Design load " + design.loadKNm2 + " kN/m² → " + result.geometry.spacing.toFixed(1) +
+    designNote.textContent = stackText + " Design load " + design.loadKNm2 + " kN/m² → " + result.geometry.spacing.toFixed(1) +
       " m horizontals, about " + design.legLoadKN + " kN per vertical (" + design.utilization + "% of the assumed " + design.allowableLegKN + " kN capacity).";
-    designNote.hidden = false;
   } else {
     drawFacade(result.geometry);
-    designNote.hidden = true;
+    designNote.textContent = stackText;
   }
+  designNote.hidden = false;
+}
+
+// 每個立柱位置使用的規格品立柱組合，例如 3.0 + 3.0 + 1.5 m + Jack Base 0.5 m = 8 m。
+function describeVerticalStack(stack, system) {
+  const pieces = stack.sequence.map(function (len) { return len.toFixed(1); }).join(" + ");
+  const jacks = system === "shoring" ? "Basic Socket 0.2 m + jacks " : "Jack Base ";
+  return "Each vertical line: " + pieces + " m verticals + " + jacks + formatMeters(stack.extension) +
+    " = " + formatMeters(stack.topHeight) + ".";
 }
 
 function badge(className, text) {
