@@ -24,6 +24,7 @@ const baySplitText = document.getElementById("bay-split-text");
 const remainderField = document.getElementById("remainder-field");
 const remainderSelect = document.getElementById("facade-remainder-bay");
 let remainderKey = "";
+let currentPlans = [];
 const downloadButton = document.getElementById("download-button");
 const rfqForm = document.getElementById("rfq-form");
 const rfqSubmit = document.getElementById("rfq-submit");
@@ -78,8 +79,10 @@ function readInputs(system) {
     workingLevels: Number(facadeForm.workingLevels.value),
     wallTies: facadeForm.wallTies.checked
   };
-  if (!remainderField.hidden) {
-    inputs.remainderBay = Number(remainderSelect.value);
+  const chosen = remainderField.hidden ? null : currentPlans[Number(remainderSelect.value)];
+  if (chosen) {
+    inputs.fullBays = chosen.fullBays;
+    inputs.fillers = chosen.fillers.slice();
   }
   return inputs;
 }
@@ -90,44 +93,56 @@ function formatMeters(value) {
   return meterFormat.format(value) + " m";
 }
 
-// Wall length ÷ Bay length：顯示整跨數與餘數；有餘數時顯示「餘數」欄位。
-// 牆長或跨距改變時，餘數欄位重新帶入建議的 Horizontal 長度。
+function describePlan(plan, bay) {
+  let text = plan.fullBays > 0 ? plan.fullBays + " × " + formatMeters(bay) : "";
+  plan.fillers.forEach(function (len) {
+    text += (text ? " + " : "") + formatMeters(len);
+  });
+  text += " = " + formatMeters(plan.covered);
+  if (plan.overshoot < 0) {
+    return text + " (short " + formatMeters(-plan.overshoot) + ", no extra bay)";
+  }
+  if (plan.overshoot === 0) {
+    return text + " (exact)";
+  }
+  return text + " (+" + formatMeters(plan.overshoot) + ")";
+}
+
+// Wall length ÷ Bay length：顯示整跨數與餘數；有餘數時列出最佳跨距組合（第一個為最佳解）。
+// 牆長或跨距改變時，重新計算並選回最佳組合。
 function updateBaySplit() {
   const length = Number(facadeForm.length.value);
   const bay = Number(facadeForm.bayLength.value);
   if (!Number.isFinite(length) || length <= 0) {
     baySplitText.textContent = "–";
     remainderField.hidden = true;
+    currentPlans = [];
     return;
   }
 
-  const split = calc.splitBays(length, bay);
-  const bayWord = split.fullBays === 1 ? " bay" : " bays";
-  if (split.remainder === 0) {
-    baySplitText.textContent = formatMeters(length) + " ÷ " + formatMeters(bay) + " = " + split.fullBays + bayWord + ", no remainder";
+  const plan = calc.planBays(length, bay);
+  const bayWord = plan.fullBays === 1 ? " bay" : " bays";
+  const summary = formatMeters(length) + " ÷ " + formatMeters(bay) + " = " + plan.fullBays + bayWord;
+  if (plan.remainder === 0) {
+    baySplitText.textContent = summary + ", no remainder";
     remainderField.hidden = true;
     remainderKey = "";
+    currentPlans = [];
     return;
   }
 
-  baySplitText.textContent = formatMeters(length) + " ÷ " + formatMeters(bay) + " = " + split.fullBays + bayWord +
-    ", remainder " + formatMeters(split.remainder);
+  baySplitText.textContent = summary + ", remainder " + formatMeters(plan.remainder);
   const key = length + "|" + bay;
   if (key !== remainderKey) {
-    const options = split.options.map(function (len) {
+    currentPlans = plan.plans;
+    const options = currentPlans.map(function (item, index) {
       const option = document.createElement("option");
-      option.value = String(len);
-      option.textContent = formatMeters(len) + (len === split.suggested ? " (suggested)" : "");
+      option.value = String(index);
+      option.textContent = (index === 0 ? "★ Best fit: " : "") + describePlan(item, bay);
       return option;
     });
-    if (split.fullBays > 0) {
-      const none = document.createElement("option");
-      none.value = "0";
-      none.textContent = "No extra bay (covers " + formatMeters(split.fullBays * bay) + ")";
-      options.push(none);
-    }
     remainderSelect.replaceChildren.apply(remainderSelect, options);
-    remainderSelect.value = String(split.suggested);
+    remainderSelect.value = "0";
     remainderKey = key;
   }
   remainderField.hidden = false;
@@ -256,16 +271,10 @@ function svgEl(name, attrs) {
 
 // 外牆架立面圖：跨距 × 步數，最上方的工作層畫踏板，部分跨距畫斜撐。
 function drawFacade(g) {
-  // 依實際長度畫每一跨；餘數跨畫在最右側並加底色標示。
-  const hasRemainder = g.remainderBay > 0;
-  const drawnFull = Math.min(g.fullBays, MAX_DRAWN - (hasRemainder ? 1 : 0));
-  const bayWidths = [];
-  for (let i = 0; i < drawnFull; i++) {
-    bayWidths.push(g.bayLength);
-  }
-  if (hasRemainder) {
-    bayWidths.push(g.remainderBay);
-  }
+  // 依實際長度畫每一跨；補跨畫在最右側並加底色標示。
+  const fillerCount = g.fillers.length;
+  const drawnFull = Math.min(g.fullBays, MAX_DRAWN - fillerCount);
+  const bayWidths = g.bayWidths.slice(g.fullBays - drawnFull);
   const drawnLength = bayWidths.reduce(function (sum, w) { return sum + w; }, 0);
   const width = 360;
   const height = 190;
@@ -279,9 +288,8 @@ function drawFacade(g) {
     xs.push(xs[xs.length - 1] + w * scale);
   });
 
-  if (hasRemainder) {
-    const x = xs[xs.length - 2];
-    parts.push(svgEl("rect", { x: x, y: top, width: xs[xs.length - 1] - x, height: height, class: "remainder-bay" }));
+  for (let i = drawnFull; i < bayWidths.length; i++) {
+    parts.push(svgEl("rect", { x: xs[i], y: top, width: xs[i + 1] - xs[i], height: height, class: "remainder-bay" }));
   }
   parts.push(svgEl("line", { x1: 0, y1: top + height + 2, x2: 400, y2: top + height + 2, class: "ground" }));
   xs.forEach(function (x) {
@@ -304,9 +312,12 @@ function drawFacade(g) {
   }
   diagram.replaceChildren.apply(diagram, parts);
 
-  let text = "Elevation: " + g.fullBays + " × " + g.bayLength.toFixed(1) + " m";
-  if (hasRemainder) {
-    text += " + 1 × " + g.remainderBay.toFixed(1) + " m remainder bay (shaded)";
+  let text = "Elevation: " + g.fullBays + " × " + formatMeters(g.bayLength);
+  g.fillers.forEach(function (len) {
+    text += " + " + formatMeters(len);
+  });
+  if (fillerCount) {
+    text += " (filler bay" + (fillerCount > 1 ? "s" : "") + " shaded)";
   }
   text += " = " + formatMeters(g.coveredLength) + ", " + g.lifts + " lifts × " + g.liftHeight.toFixed(1) +
     " m, " + g.levels + " decked level(s)";

@@ -206,21 +206,95 @@
   }
 
   // 外牆／施工通道鷹架（Access / Facade, Ø48.6）。
-  // Wall length ÷ Bay length：整跨數與餘數，並建議餘數那一跨使用的 Horizontal 長度。
+  // Wall length ÷ Bay length：整跨數與餘數。
   function splitBays(length, bayLength) {
-    const d = DATA.facade;
     const fullBays = Math.floor(length / bayLength + 1e-9);
     const remainder = roundTo(length - fullBays * bayLength, 2);
-    if (remainder <= 0.005) {
-      return { fullBays: fullBays, remainder: 0, options: [], suggested: 0 };
+    return { fullBays: fullBays, remainder: remainder <= 0.005 ? 0 : remainder };
+  }
+
+  // 找出最佳跨距組合：主跨數量可往下調整，最後一段用 1～2 支標準 Horizontal 補足，
+  // 讓總長剛好蓋滿牆長、超出最少。排序：超出長度 → 非標準尺寸數 → 補跨支數 → 主跨數多者優先。
+  const MAX_FILLERS = 2;
+  const PLAN_LIMIT = 5;
+
+  function fillerCombos(lengths) {
+    const combos = [[]];
+    lengths.forEach(function (a, i) {
+      combos.push([a]);
+      if (MAX_FILLERS >= 2) {
+        lengths.slice(i).forEach(function (b) {
+          combos.push([b, a]);
+        });
+      }
+    });
+    return combos;
+  }
+
+  function planBays(length, bayLength) {
+    const d = DATA.facade;
+    const split = splitBays(length, bayLength);
+    const combos = fillerCombos(d.bayLengths);
+    const longest = d.bayLengths[d.bayLengths.length - 1];
+    const minFull = Math.max(0, split.fullBays - Math.ceil((MAX_FILLERS * longest) / bayLength));
+    const plans = [];
+
+    for (let n = split.fullBays; n >= minFull; n--) {
+      const base = n * bayLength;
+      combos.forEach(function (fillers) {
+        if (n === 0 && fillers.length === 0) {
+          return;
+        }
+        const covered = roundTo(base + fillers.reduce(function (sum, len) { return sum + len; }, 0), 2);
+        const overshoot = roundTo(covered - length, 2);
+        if (overshoot < -0.005) {
+          return;
+        }
+        // 補跨長度與主跨相同時，視為多一個整跨，避免重複的組合。
+        const extraFull = fillers.filter(function (len) { return len === bayLength; }).length;
+        const ownFillers = fillers.filter(function (len) { return len !== bayLength; });
+        plans.push({
+          fullBays: n + extraFull,
+          fillers: ownFillers,
+          covered: covered,
+          overshoot: Math.max(0, overshoot),
+          customCount: ownFillers.filter(function (len) { return d.diagonals[len].custom || d.planks[len].custom; }).length
+        });
+      });
     }
-    const options = d.bayLengths.filter(function (len) { return len <= bayLength + 1e-9; });
-    const fit = options.find(function (len) { return len >= remainder - 1e-9; });
-    return { fullBays: fullBays, remainder: remainder, options: options, suggested: fit || bayLength };
+
+    plans.sort(comparePlans);
+    const seen = {};
+    const ranked = plans.filter(function (plan) {
+      const key = plan.fullBays + "|" + plan.fillers.join(",");
+      if (seen[key]) {
+        return false;
+      }
+      seen[key] = true;
+      return true;
+    }).slice(0, PLAN_LIMIT);
+    // 另外提供「不補跨」：只用整跨，可能略短於牆長。
+    if (split.remainder > 0 && split.fullBays > 0) {
+      ranked.push({
+        fullBays: split.fullBays,
+        fillers: [],
+        covered: roundTo(split.fullBays * bayLength, 2),
+        overshoot: -split.remainder,
+        customCount: 0
+      });
+    }
+    return { fullBays: split.fullBays, remainder: split.remainder, plans: ranked, best: ranked[0] };
+  }
+
+  function comparePlans(a, b) {
+    return (a.overshoot - b.overshoot) ||
+      (a.customCount - b.customCount) ||
+      (a.fillers.length - b.fillers.length) ||
+      (b.fullBays - a.fullBays);
   }
 
   // 外牆／施工通道鷹架（Access / Facade, Ø48.6）。
-  // input.remainderBay：餘數那一跨的 Horizontal 長度；0 表示不加這一跨。
+  // input.fullBays 與 input.fillers：指定跨距組合；未指定時自動採用最佳組合。
   function estimateFacade(input) {
     const d = DATA.facade;
     const errors = [];
@@ -237,26 +311,38 @@
     }
 
     const bay = input.bayLength;
-    const split = splitBays(input.length, bay);
-    let remainderBay = 0;
-    if (split.remainder > 0) {
-      remainderBay = input.remainderBay === undefined ? split.suggested : Number(input.remainderBay);
-      if (remainderBay !== 0 && split.options.indexOf(remainderBay) === -1) {
-        return { ok: false, errors: ["Remainder bay length is not supported."] };
+    const plan = planBays(input.length, bay);
+    let fullBays = plan.best ? plan.best.fullBays : 0;
+    let fillers = plan.best ? plan.best.fillers : [];
+    if (Array.isArray(input.fillers) && Number.isInteger(input.fullBays)) {
+      fullBays = input.fullBays;
+      fillers = input.fillers.map(Number);
+      const invalid = fillers.some(function (len) { return d.bayLengths.indexOf(len) === -1; });
+      if (invalid || fullBays < 0 || fillers.length > MAX_FILLERS || fullBays + fillers.length === 0) {
+        return { ok: false, errors: ["The selected bay layout is not supported."] };
       }
     }
-    const bayGroups = [];
-    if (split.fullBays > 0) {
-      bayGroups.push({ length: bay, count: split.fullBays });
-    }
-    if (remainderBay > 0) {
-      bayGroups.push({ length: remainderBay, count: 1 });
-    }
-    if (!bayGroups.length) {
-      return { ok: false, errors: ["The wall is shorter than one bay. Please choose a remainder bay length."] };
-    }
 
-    const bays = split.fullBays + (remainderBay > 0 ? 1 : 0);
+    const bayGroups = [];
+    if (fullBays > 0) {
+      bayGroups.push({ length: bay, count: fullBays });
+    }
+    fillers.forEach(function (len) {
+      const group = bayGroups.find(function (g) { return g.length === len; });
+      if (group) {
+        group.count += 1;
+      } else {
+        bayGroups.push({ length: len, count: 1 });
+      }
+    });
+    const bayWidths = [];
+    for (let i = 0; i < fullBays; i++) {
+      bayWidths.push(bay);
+    }
+    fillers.forEach(function (len) { bayWidths.push(len); });
+    const coveredLength = roundTo(bayWidths.reduce(function (sum, w) { return sum + w; }, 0), 2);
+
+    const bays = bayWidths.length;
     const lifts = Math.ceil(input.height / d.liftHeight - 1e-9);
     const levels = Math.min(Math.max(1, Math.round(input.workingLevels || 1)), lifts);
     const frames = bays + 1;
@@ -297,15 +383,17 @@
 
     return Object.assign({ ok: true, errors: [] }, summarize(items, {
       system: "facade",
-      split: { fullBays: split.fullBays, remainder: split.remainder, remainderBay: remainderBay },
+      split: { fullBays: plan.fullBays, remainder: plan.remainder },
+      layout: { fullBays: fullBays, fillers: fillers, covered: coveredLength, difference: roundTo(coveredLength - input.length, 2) },
       geometry: {
         bays: bays,
-        fullBays: split.fullBays,
-        remainderBay: remainderBay,
+        fullBays: fullBays,
+        fillers: fillers,
+        bayWidths: bayWidths,
         lifts: lifts,
         levels: levels,
         bayLength: bay,
-        coveredLength: roundTo(split.fullBays * bay + remainderBay, 2),
+        coveredLength: coveredLength,
         liftHeight: d.liftHeight,
         height: input.height
       }
@@ -381,7 +469,7 @@
     }).join("\r\n");
   }
 
-  const api = { DATA: DATA, splitBays: splitBays, estimateFacade: estimateFacade, estimateShoring: estimateShoring, toCsv: toCsv };
+  const api = { DATA: DATA, splitBays: splitBays, planBays: planBays, estimateFacade: estimateFacade, estimateShoring: estimateShoring, toCsv: toCsv };
   if (typeof module === "object" && module.exports) {
     module.exports = api;
   } else {
