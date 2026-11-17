@@ -22,6 +22,7 @@
     facade: {
       liftHeight: 2.0,          // 斜桿標準高度 2.0 m
       jackRange: [0.08, 0.5],   // Jack Base 可調範圍 80–500 mm（型錄 5.1）
+      bottomOnlyVerticals: [3.0], // 3.0 m 立柱只用在第一層（最底層），往上用 2.0 m 以下
       bracePerBays: 3,          // 每幾個跨距設一組斜桿（假設）
       tieSpacingH: 6.0,         // 壁連座水平間距（假設）
       tieSpacingV: 4.0,         // 壁連座垂直間距（假設）
@@ -84,6 +85,7 @@
     shoring: {
       liftHeight: 1.5,          // 斜桿標準高度 1.5 m
       jackRange: [0.16, 0.9],   // Jack Base + U-Head Jack 合計可調範圍（各 80–450 mm）
+      bottomOnlyVerticals: [3.0], // 3.0 m 立柱只用在第一層（最底層），往上用 2.0 m 以下
       socketLength: 0.2,        // Basic Socket V62020
       allowableLegKN: 45,       // 單支立柱容許荷重（kN）—假設值，需工程部提供
       concreteKNm3: 25,
@@ -138,8 +140,10 @@
   //   1. 立柱總長取 0.5 m 的倍數（所有規格品長度都是 0.5 m 的倍數），
   //      讓剩下的高度落在調整座可調範圍內；
   //   2. 在相同總長下，使用最少支數，支數相同時優先用長的立柱。
-  // height：要達到的高度；fixed：立柱以外的固定高度（例如 Basic Socket）；range：調整座可調範圍。
-  function planVerticalStack(height, table, fixed, range) {
+  // height：要達到的高度；fixed：立柱以外的固定高度（例如 Basic Socket）；range：調整座可調範圍；
+  // bottomOnlyLengths：只能用在最底層的長度（3.0 m 只用在第一層）。
+  // sequence 由下往上排列。
+  function planVerticalStack(height, table, fixed, range, bottomOnlyLengths) {
     const unit = 0.5;
     const lengths = Object.keys(table).map(Number).sort(function (a, b) { return b - a; });
     const available = height - fixed;
@@ -151,8 +155,12 @@
     const stackLength = roundTo(units * unit, 2);
     const extension = roundTo(Math.min(Math.max(available - stackLength, range[0]), range[1]), 2);
 
-    // 動態規劃：best[u] = 組出 u 個單位長度的最佳組合（支數最少，再比長立柱數量）。
-    const pieceUnits = lengths.map(function (len) { return Math.round(len / unit); });
+    // 底層專用長度（例如 3.0 m）最多一支，只放在最下面；其餘高度用較短的規格品。
+    const bottomOnly = (bottomOnlyLengths || []).filter(function (len) { return table[len]; });
+    const upperLengths = lengths.filter(function (len) { return bottomOnly.indexOf(len) === -1; });
+
+    // 動態規劃：best[u] = 只用上層長度組出 u 個單位長度的最佳組合（支數最少，再比長立柱數量）。
+    const pieceUnits = upperLengths.map(function (len) { return Math.round(len / unit); });
     const best = [[]];
     for (let u = 1; u <= units; u++) {
       let choice = null;
@@ -168,14 +176,27 @@
       });
       best[u] = choice;
     }
+
+    // 比較「底層放一支底層專用立柱」與「全部用上層長度」，支數少者優先；同支數時底層用長立柱。
+    let sequence = best[units] ? best[units].map(function (index) { return upperLengths[index]; }) : null;
+    bottomOnly.forEach(function (len) {
+      const rest = units - Math.round(len / unit);
+      if (rest < 0 || !best[rest]) {
+        return;
+      }
+      const candidate = [len].concat(best[rest].map(function (index) { return upperLengths[index]; }));
+      if (!sequence || candidate.length <= sequence.length) {
+        sequence = candidate;
+      }
+    });
+    sequence = sequence || [];
     const pieces = {};
-    (best[units] || []).forEach(function (index) {
-      const len = lengths[index];
+    sequence.forEach(function (len) {
       pieces[len] = (pieces[len] || 0) + 1;
     });
     return {
       pieces: pieces,
-      sequence: (best[units] || []).map(function (index) { return lengths[index]; }),
+      sequence: sequence,
       stackLength: stackLength,
       extension: extension,
       topHeight: roundTo(fixed + stackLength + extension, 2)
@@ -371,7 +392,7 @@
     const levels = Math.min(Math.max(1, Math.round(input.workingLevels || 1)), lifts);
     const frames = bays + 1;
     const legs = frames * 2;
-    const stack = planVerticalStack(input.height, d.verticals, 0, d.jackRange);
+    const stack = planVerticalStack(input.height, d.verticals, 0, d.jackRange, d.bottomOnlyVerticals);
     const braceBay = bayGroups[0].length;
     const braceSets = Math.max(1, Math.ceil(bayGroups[0].count / d.bracePerBays));
     const layout = d.deckLayout[input.width];
@@ -450,7 +471,7 @@
     const nx = Math.ceil(input.areaLength / spacing - 1e-9) + 1;
     const ny = Math.ceil(input.areaWidth / spacing - 1e-9) + 1;
     const legs = nx * ny;
-    const stack = planVerticalStack(input.height, d.verticals, d.socketLength, d.jackRange);
+    const stack = planVerticalStack(input.height, d.verticals, d.socketLength, d.jackRange, d.bottomOnlyVerticals);
     const lifts = Math.ceil(stack.stackLength / d.liftHeight - 1e-9);
     const horizontalCount = ((nx - 1) * ny + (ny - 1) * nx) * (lifts + 1);
     const perimeterBays = 2 * (nx - 1) + 2 * (ny - 1);
