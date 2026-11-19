@@ -18,58 +18,61 @@
 <body>
   <header class="site-header">
     <div class="header-inner">
-      <p class="brand">SUCOOT <span>Ring Lock Systems</span></p>
-      <h1>Scaffolding Estimator</h1>
-      <p class="lead">Enter your project dimensions to get a preliminary bill of materials, total weight and container estimate — then send it to our engineers for a quotation.</p>
+      <div class="header-top">
+        <p class="brand">SUCOOT <span data-i18n="brand.sub">Ring Lock Systems</span></p>
+        <button id="lang-toggle" type="button" class="lang-toggle" data-i18n="lang.toggle" data-i18n-aria-label="lang.toggleLabel" aria-label="切換為繁體中文">中文</button>
+      </div>
+      <h1 data-i18n="header.title">Scaffolding Estimator</h1>
+      <p class="lead" data-i18n="header.lead">Enter your project dimensions to get a preliminary bill of materials, total weight and container estimate — then send it to our engineers for a quotation.</p>
       <div class="install-area">
-        <button id="install-button" type="button" class="install-button" hidden>Install app</button>
-        <p id="ios-install-hint" class="install-hint" hidden>Install on iPhone: tap <strong>Share</strong>, then <strong>Add to Home Screen</strong>.</p>
+        <button id="install-button" type="button" class="install-button" data-i18n="install.button" hidden>Install app</button>
+        <p id="ios-install-hint" class="install-hint" data-i18n-html="install.ios" hidden>Install on iPhone: tap <strong>Share</strong>, then <strong>Add to Home Screen</strong>.</p>
       </div>
     </div>
   </header>
 
-  <div id="offline-banner" class="banner offline" role="status" hidden>
+  <div id="offline-banner" class="banner offline" role="status" data-i18n="banner.offline" hidden>
     You are offline. Estimates still work; quotation requests will open an email draft instead.
   </div>
 
-  <div id="placeholder-banner" class="banner" hidden>
+  <div id="placeholder-banner" class="banner" data-i18n="banner.placeholder" hidden>
     Prototype: component sizes follow the SUCOOT 2026 catalogs. Weights marked “est.”, the leg load capacity and container loads are still estimates awaiting SUCOOT engineering data.
   </div>
 
   <main class="layout">
     <section class="panel system" aria-labelledby="step1-title">
-      <h2 id="step1-title"><span class="step">1</span>Choose a system</h2>
-      <div class="system-options" role="radiogroup" aria-label="Scaffolding system">
+      <h2 id="step1-title"><span class="step">1</span><span data-i18n="step1.title">Choose a system</span></h2>
+      <div class="system-options" role="radiogroup" aria-label="Scaffolding system" data-i18n-aria-label="system.groupLabel">
         <label class="system-card">
           <input type="radio" name="system" value="facade" checked>
-          <span class="system-name">Access / Facade Scaffolding</span>
-          <span class="system-desc">Ø48.6 × t2.5 verticals · Ø42.7 horizontals · 2.0 m lifts</span>
+          <span class="system-name" data-i18n="system.facade.name">Access / Facade Scaffolding</span>
+          <span class="system-desc" data-i18n="system.facade.desc">Ø48.6 × t2.5 verticals · Ø42.7 horizontals · 2.0 m lifts</span>
         </label>
         <label class="system-card">
           <input type="radio" name="system" value="shoring">
-          <span class="system-name">Shoring Towers (Heavy Duty)</span>
-          <span class="system-desc">Ø60.2 × t3.2 verticals · Ø48.6 horizontals · 1.5 m lifts</span>
+          <span class="system-name" data-i18n="system.shoring.name">Shoring Towers (Heavy Duty)</span>
+          <span class="system-desc" data-i18n="system.shoring.desc">Ø60.2 × t3.2 verticals · Ø48.6 horizontals · 1.5 m lifts</span>
         </label>
       </div>
     </section>
 
     <section class="panel dimensions" aria-labelledby="step2-title">
-      <h2 id="step2-title"><span class="step">2</span>Project dimensions</h2>
+      <h2 id="step2-title"><span class="step">2</span><span data-i18n="step2.title">Project dimensions</span></h2>
 
       <form id="facade-form" class="dimension-form" novalidate>
         <div class="field-row">
           <div class="field">
-            <label for="facade-length">Wall length (m)</label>
+            <label for="facade-length" data-i18n="facade.length">Wall length (m)</label>
             <input id="facade-length" name="length" type="number" min="1" max="1000" step="0.1" value="30" required>
           </div>
           <div class="field">
-            <label for="facade-height">Height (m)</label>
+            <label for="facade-height" data-i18n="facade.height">Height (m)</label>
             <input id="facade-height" name="height" type="number" min="2" max="100" step="0.1" value="12" required>
           </div>
         </div>
         <div class="field-row">
           <div class="field">
-            <label for="facade-bay">Bay length (horizontal)</label>
+            <label for="facade-bay" data-i18n="facade.bay">Bay length (horizontal)</label>
             <select id="facade-bay" name="bayLength">
               <option value="0.9">0.9 m</option>
               <option value="1.2">1.2 m</option>
@@ -79,27 +82,27 @@
             </select>
           </div>
           <div class="field">
-            <label for="facade-width">Scaffold width (horizontal)</label>
+            <label for="facade-width" data-i18n="facade.width">Scaffold width (horizontal)</label>
             <select id="facade-width" name="width">
-              <option value="0.9" selected>0.9 m (550 + 265 planks)</option>
-              <option value="1.2">1.2 m (2 × 550 planks)</option>
+              <option value="0.9" selected data-i18n="facade.width09">0.9 m (550 + 265 planks)</option>
+              <option value="1.2" data-i18n="facade.width12">1.2 m (2 × 550 planks)</option>
             </select>
           </div>
         </div>
         <div class="bay-split" aria-live="polite">
           <p id="bay-split-text" class="bay-split-text">–</p>
           <div id="remainder-field" class="field remainder-field" hidden>
-            <label for="facade-remainder-bay">Bay layout (best fit first)</label>
+            <label for="facade-remainder-bay" data-i18n="facade.layout">Bay layout (best fit first)</label>
             <select id="facade-remainder-bay" name="remainderBay"></select>
           </div>
         </div>
         <div class="field-row">
           <div class="field">
-            <label for="facade-levels">Decked working levels</label>
+            <label for="facade-levels" data-i18n="facade.levels">Decked working levels</label>
             <input id="facade-levels" name="workingLevels" type="number" min="1" max="50" step="1" value="2" required>
           </div>
           <div class="field checkbox-field">
-            <label><input id="facade-ties" name="wallTies" type="checkbox" checked> Include wall ties</label>
+            <label><input id="facade-ties" name="wallTies" type="checkbox" checked> <span data-i18n="facade.ties">Include wall ties</span></label>
           </div>
         </div>
       </form>
@@ -107,25 +110,25 @@
       <form id="shoring-form" class="dimension-form" novalidate hidden>
         <div class="field-row">
           <div class="field">
-            <label for="shoring-length">Area length (m)</label>
+            <label for="shoring-length" data-i18n="shoring.length">Area length (m)</label>
             <input id="shoring-length" name="areaLength" type="number" min="1" max="500" step="0.1" value="20" required>
           </div>
           <div class="field">
-            <label for="shoring-width">Area width (m)</label>
+            <label for="shoring-width" data-i18n="shoring.width">Area width (m)</label>
             <input id="shoring-width" name="areaWidth" type="number" min="1" max="500" step="0.1" value="10" required>
           </div>
         </div>
         <div class="field-row">
           <div class="field">
-            <label for="shoring-height">Floor to soffit (m)</label>
+            <label for="shoring-height" data-i18n="shoring.height">Floor to soffit (m)</label>
             <input id="shoring-height" name="height" type="number" min="1.5" max="40" step="0.1" value="8" required>
           </div>
           <div class="field">
-            <label for="shoring-slab">Slab thickness (m)</label>
+            <label for="shoring-slab" data-i18n="shoring.slab">Slab thickness (m)</label>
             <input id="shoring-slab" name="slabThickness" type="number" min="0.1" max="3" step="0.05" value="0.3" required>
           </div>
         </div>
-        <p class="hint">The horizontal length (vertical spacing: 0.6 – 2.4 m) is selected automatically from the slab load.</p>
+        <p class="hint" data-i18n="shoring.hint">The horizontal length (vertical spacing: 0.6 – 2.4 m) is selected automatically from the slab load.</p>
       </form>
 
       <p id="input-message" class="message error" role="alert" hidden></p>
@@ -133,16 +136,16 @@
 
     <section class="panel results" aria-labelledby="results-title" aria-live="polite">
       <div class="results-header">
-        <h2 id="results-title">Estimated materials</h2>
-        <button id="download-button" type="button" class="secondary">Download CSV</button>
+        <h2 id="results-title" data-i18n="results.title">Estimated materials</h2>
+        <button id="download-button" type="button" class="secondary" data-i18n="results.csv">Download CSV</button>
       </div>
 
       <div class="results-body">
       <div class="results-visual">
       <div class="stats">
-        <div class="stat"><span class="stat-label">Total weight</span><span id="stat-weight" class="stat-value">–</span></div>
-        <div class="stat"><span class="stat-label">Components</span><span id="stat-pieces" class="stat-value">–</span></div>
-        <div class="stat"><span class="stat-label">Containers</span><span id="stat-containers" class="stat-value">–</span></div>
+        <div class="stat"><span class="stat-label" data-i18n="stat.weight">Total weight</span><span id="stat-weight" class="stat-value">–</span></div>
+        <div class="stat"><span class="stat-label" data-i18n="stat.pieces">Components</span><span id="stat-pieces" class="stat-value">–</span></div>
+        <div class="stat"><span class="stat-label" data-i18n="stat.containers">Containers</span><span id="stat-containers" class="stat-value">–</span></div>
       </div>
 
       <figure class="diagram">
@@ -158,90 +161,91 @@
       <div class="table-wrap">
         <table class="bom">
           <thead>
-            <tr><th scope="col">Item</th><th scope="col">Spec</th><th scope="col" class="num">Qty</th><th scope="col" class="num">Weight (kg)</th></tr>
+            <tr><th scope="col" data-i18n="table.item">Item</th><th scope="col" data-i18n="table.spec">Spec</th><th scope="col" class="num" data-i18n="table.qty">Qty</th><th scope="col" class="num" data-i18n="table.weight">Weight (kg)</th></tr>
           </thead>
           <tbody id="bom-body"></tbody>
           <tfoot>
-            <tr><th scope="row" colspan="2">Total</th><td id="bom-total-qty" class="num">–</td><td id="bom-total-kg" class="num">–</td></tr>
+            <tr><th scope="row" colspan="2" data-i18n="table.total">Total</th><td id="bom-total-qty" class="num">–</td><td id="bom-total-kg" class="num">–</td></tr>
           </tfoot>
         </table>
       </div>
       <p id="bom-legend" class="disclaimer" hidden></p>
-      <p class="disclaimer">This is a preliminary estimate for budgeting only. Final quantities depend on site conditions and SUCOOT's structural calculation.</p>
+      <p class="disclaimer" data-i18n="results.disclaimer">This is a preliminary estimate for budgeting only. Final quantities depend on site conditions and SUCOOT's structural calculation.</p>
       </div>
       </div>
     </section>
 
     <section class="panel rfq" aria-labelledby="step3-title">
-      <h2 id="step3-title"><span class="step">3</span>Request a quotation</h2>
-      <p class="hint">Your dimensions and the estimated materials above are attached automatically.</p>
+      <h2 id="step3-title"><span class="step">3</span><span data-i18n="step3.title">Request a quotation</span></h2>
+      <p class="hint" data-i18n="rfq.hint">Your dimensions and the estimated materials above are attached automatically.</p>
       <form id="rfq-form" novalidate>
         <div class="field-row">
           <div class="field">
-            <label for="company-name">Company name *</label>
+            <label for="company-name" data-i18n="rfq.company">Company name *</label>
             <input id="company-name" name="company_name" type="text" maxlength="120" autocomplete="organization" required>
           </div>
           <div class="field">
-            <label for="country">Country *</label>
+            <label for="country" data-i18n="rfq.country">Country *</label>
             <input id="country" name="country" type="text" maxlength="80" autocomplete="country-name" required>
           </div>
         </div>
         <div class="field-row">
           <div class="field">
-            <label for="contact-name">Contact person *</label>
+            <label for="contact-name" data-i18n="rfq.contact">Contact person *</label>
             <input id="contact-name" name="contact_name" type="text" maxlength="80" autocomplete="name" required>
           </div>
           <div class="field">
-            <label for="email">Email *</label>
+            <label for="email" data-i18n="rfq.email">Email *</label>
             <input id="email" name="email" type="email" maxlength="254" autocomplete="email" required>
           </div>
         </div>
         <div class="field-row">
           <div class="field">
-            <label for="phone">Phone / WhatsApp</label>
+            <label for="phone" data-i18n="rfq.phone">Phone / WhatsApp</label>
             <input id="phone" name="phone" type="tel" maxlength="40" autocomplete="tel">
           </div>
           <div class="field">
-            <label for="project-location">Project location</label>
-            <input id="project-location" name="project_location" type="text" maxlength="120" placeholder="City / project name">
+            <label for="project-location" data-i18n="rfq.location">Project location</label>
+            <input id="project-location" name="project_location" type="text" maxlength="120" placeholder="City / project name" data-i18n-placeholder="rfq.locationPlaceholder">
           </div>
         </div>
         <div class="field-row">
           <div class="field">
-            <label for="request-type">What do you need?</label>
+            <label for="request-type" data-i18n="rfq.need">What do you need?</label>
             <select id="request-type" name="request_type">
-              <option value="quotation" selected>A quotation</option>
-              <option value="design">A design evaluation</option>
+              <option value="quotation" selected data-i18n="rfq.needQuote">A quotation</option>
+              <option value="design" data-i18n="rfq.needDesign">A design evaluation</option>
             </select>
           </div>
           <div class="field">
-            <label for="needed-by">Needed on site by</label>
+            <label for="needed-by" data-i18n="rfq.neededBy">Needed on site by</label>
             <input id="needed-by" name="needed_by" type="date">
           </div>
         </div>
         <div class="field">
-          <label for="notes">Project details</label>
-          <textarea id="notes" name="notes" rows="4" maxlength="2000" placeholder="Structure type, loads, delivery port, anything else we should know"></textarea>
+          <label for="notes" data-i18n="rfq.details">Project details</label>
+          <textarea id="notes" name="notes" rows="4" maxlength="2000" data-i18n-placeholder="rfq.detailsPlaceholder" placeholder="Structure type, loads, delivery port, anything else we should know"></textarea>
         </div>
         <div class="field honeypot" aria-hidden="true">
           <label for="website">Website</label>
           <input id="website" name="website" type="text" tabindex="-1" autocomplete="off">
         </div>
         <div class="field checkbox-field">
-          <label><input id="privacy-consent" name="privacy_consent" type="checkbox" required> I agree that SUCOOT may use these details to respond to my request. *</label>
+          <label><input id="privacy-consent" name="privacy_consent" type="checkbox" required> <span data-i18n="rfq.consent">I agree that SUCOOT may use these details to respond to my request. *</span></label>
         </div>
-        <button id="rfq-submit" type="submit">Send quotation request</button>
+        <button id="rfq-submit" type="submit" data-i18n="rfq.submit">Send quotation request</button>
         <p id="rfq-message" class="message" role="status" aria-live="polite" hidden></p>
       </form>
     </section>
   </main>
 
   <footer class="site-footer">
-    <p>SUCOOT CO., LTD. · Taichung, Taiwan · <a href="mailto:info.ws@sucoot.com">info.ws@sucoot.com</a> · <a href="https://www.sucoot.com">www.sucoot.com</a></p>
+    <p><span data-i18n="footer.company">SUCOOT CO., LTD. · Taichung, Taiwan</span> · <a href="mailto:info.ws@sucoot.com">info.ws@sucoot.com</a> · <a href="https://www.sucoot.com">www.sucoot.com</a></p>
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
   <script src="../config.js"></script>
+  <script src="i18n.js"></script>
   <script src="calc.js"></script>
   <script src="app.js"></script>
 </body>
