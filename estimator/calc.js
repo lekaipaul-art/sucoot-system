@@ -239,9 +239,24 @@
     }, extra);
   }
 
-  function validateRange(errors, value, label, min, max) {
+  // 錯誤以代碼與參數回傳，由畫面依語言翻譯；message 為英文備用說明。
+  const FIELD_LABELS = {
+    wallLength: "Wall length",
+    height: "Height",
+    areaLength: "Area length",
+    areaWidth: "Area width",
+    shoringHeight: "Shoring height",
+    slabThickness: "Slab thickness"
+  };
+
+  function error(code, params, message) {
+    return { code: code, params: params || {}, message: message };
+  }
+
+  function validateRange(errors, value, field, min, max) {
     if (!Number.isFinite(value) || value < min || value > max) {
-      errors.push(label + " must be between " + min + " and " + max + ".");
+      errors.push(error("range", { field: field, min: min, max: max },
+        FIELD_LABELS[field] + " must be between " + min + " and " + max + "."));
     }
   }
 
@@ -343,13 +358,13 @@
   function estimateFacade(input) {
     const d = DATA.facade;
     const errors = [];
-    validateRange(errors, input.length, "Wall length", 1, 1000);
-    validateRange(errors, input.height, "Height", 2, 100);
+    validateRange(errors, input.length, "wallLength", 1, 1000);
+    validateRange(errors, input.height, "height", 2, 100);
     if (!d.horizontals[input.bayLength]) {
-      errors.push("Bay length is not supported.");
+      errors.push(error("bayLength", {}, "Bay length is not supported."));
     }
     if (!d.deckLayout[input.width]) {
-      errors.push("Scaffold width is not supported.");
+      errors.push(error("width", {}, "Scaffold width is not supported."));
     }
     if (errors.length) {
       return { ok: false, errors: errors };
@@ -364,7 +379,7 @@
       fillers = input.fillers.map(Number);
       const invalid = fillers.some(function (len) { return d.bayLengths.indexOf(len) === -1; });
       if (invalid || fullBays < 0 || fillers.length > MAX_FILLERS || fullBays + fillers.length === 0) {
-        return { ok: false, errors: ["The selected bay layout is not supported."] };
+        return { ok: false, errors: [error("layout", {}, "The selected bay layout is not supported.")] };
       }
     }
 
@@ -450,10 +465,10 @@
   function estimateShoring(input) {
     const d = DATA.shoring;
     const errors = [];
-    validateRange(errors, input.areaLength, "Area length", 1, 500);
-    validateRange(errors, input.areaWidth, "Area width", 1, 500);
-    validateRange(errors, input.height, "Shoring height", 1.5, 40);
-    validateRange(errors, input.slabThickness, "Slab thickness", 0.1, 3);
+    validateRange(errors, input.areaLength, "areaLength", 1, 500);
+    validateRange(errors, input.areaWidth, "areaWidth", 1, 500);
+    validateRange(errors, input.height, "shoringHeight", 1.5, 40);
+    validateRange(errors, input.slabThickness, "slabThickness", 0.1, 3);
     if (errors.length) {
       return { ok: false, errors: errors };
     }
@@ -463,7 +478,8 @@
     if (!spacing) {
       return {
         ok: false,
-        errors: ["The design load (" + loadKNm2 + " kN/m²) is beyond this estimator. Please request a design evaluation from our engineers."]
+        errors: [error("load", { load: loadKNm2 },
+          "The design load (" + loadKNm2 + " kN/m²) is beyond this estimator. Please request a design evaluation from our engineers.")]
       };
     }
 
@@ -501,22 +517,7 @@
     }));
   }
 
-  function toCsv(result) {
-    const rows = [["Code", "Item", "Specification", "Qty (pcs)", "Unit weight (kg)", "Total weight (kg)", "Weight source", "Standard size"]];
-    result.items.forEach(function (item) {
-      rows.push([item.code, item.name, item.spec, item.qty, item.unitKg, item.totalKg,
-        item.weightSource === E ? "Estimated" : "Catalog", item.custom ? "Custom" : "Standard"]);
-    });
-    rows.push(["", "Total", "", result.totalPieces, "", result.totalKg, "", ""]);
-    return rows.map(function (row) {
-      return row.map(function (cell) {
-        const text = String(cell);
-        return /[",\n]/.test(text) ? "\"" + text.replace(/"/g, "\"\"") + "\"" : text;
-      }).join(",");
-    }).join("\r\n");
-  }
-
-  const api = { DATA: DATA, splitBays: splitBays, planBays: planBays, planVerticalStack: planVerticalStack, estimateFacade: estimateFacade, estimateShoring: estimateShoring, toCsv: toCsv };
+  const api = { DATA: DATA, splitBays: splitBays, planBays: planBays, planVerticalStack: planVerticalStack, estimateFacade: estimateFacade, estimateShoring: estimateShoring };
   if (typeof module === "object" && module.exports) {
     module.exports = api;
   } else {

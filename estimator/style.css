@@ -619,3 +619,29 @@ button.secondary:hover:not(:disabled) {
   fill: var(--accent);
   opacity: 0.18;
 }
+
+.header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.header-top .brand {
+  margin: 0;
+}
+
+.lang-toggle {
+  flex: none;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: transparent;
+  color: #ffffff;
+  font-size: 0.9rem;
+}
+
+.lang-toggle:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+}

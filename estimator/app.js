@@ -4,6 +4,8 @@ const MAX_DRAWN = 40;
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 const calc = window.ScaffoldCalc;
+const i18n = window.I18n;
+const t = i18n.t;
 const client = createSupabaseClient();
 
 const systemInputs = document.querySelectorAll("input[name='system']");
@@ -100,12 +102,12 @@ function describePlan(plan, bay) {
   });
   text += " = " + formatMeters(plan.covered);
   if (plan.overshoot < 0) {
-    return text + " (short " + formatMeters(-plan.overshoot) + ", no extra bay)";
+    return text + t("plan.short", { d: formatMeters(-plan.overshoot) });
   }
   if (plan.overshoot === 0) {
-    return text + " (exact)";
+    return text + t("plan.exact");
   }
-  return text + " (+" + formatMeters(plan.overshoot) + ")";
+  return text + t("plan.over", { d: formatMeters(plan.overshoot) });
 }
 
 // Wall length ÷ Bay length：顯示整跨數與餘數；有餘數時列出最佳跨距組合（第一個為最佳解）。
@@ -116,35 +118,39 @@ function updateBaySplit() {
   if (!Number.isFinite(length) || length <= 0) {
     baySplitText.textContent = "–";
     remainderField.hidden = true;
+    remainderKey = "";
     currentPlans = [];
     return;
   }
 
   const plan = calc.planBays(length, bay);
-  const bayWord = plan.fullBays === 1 ? " bay" : " bays";
-  const summary = formatMeters(length) + " ÷ " + formatMeters(bay) + " = " + plan.fullBays + bayWord;
+  const summary = t(plan.fullBays === 1 ? "split.summaryOne" : "split.summary",
+    { length: formatMeters(length), bay: formatMeters(bay), n: plan.fullBays });
   if (plan.remainder === 0) {
-    baySplitText.textContent = summary + ", no remainder";
+    baySplitText.textContent = summary + t("split.noRemainder");
     remainderField.hidden = true;
     remainderKey = "";
     currentPlans = [];
     return;
   }
 
-  baySplitText.textContent = summary + ", remainder " + formatMeters(plan.remainder);
+  baySplitText.textContent = summary + t("split.remainder", { r: formatMeters(plan.remainder) });
   const key = length + "|" + bay;
   if (key !== remainderKey) {
     currentPlans = plan.plans;
     const options = currentPlans.map(function (item, index) {
       const option = document.createElement("option");
       option.value = String(index);
-      option.textContent = (index === 0 ? "★ Best fit: " : "") + describePlan(item, bay);
       return option;
     });
     remainderSelect.replaceChildren.apply(remainderSelect, options);
     remainderSelect.value = "0";
     remainderKey = key;
   }
+  // 每次更新都重寫選項文字（切換語言時保留原本的選擇）。
+  Array.prototype.forEach.call(remainderSelect.options, function (option, index) {
+    option.textContent = (index === 0 ? t("plan.best") : "") + describePlan(currentPlans[index], bay);
+  });
   remainderField.hidden = false;
 }
 
@@ -162,7 +168,7 @@ function update() {
   if (!result.ok) {
     currentInputs = null;
     currentResult = null;
-    showMessage(inputMessage, result.errors.join(" "), "error");
+    showMessage(inputMessage, result.errors.map(describeCalcError).join(" "), "error");
     renderEmpty();
     return;
   }
@@ -171,6 +177,14 @@ function update() {
   currentInputs = Object.assign({ system: system }, inputs);
   currentResult = result;
   renderResult(result);
+}
+
+function describeCalcError(error) {
+  const params = Object.assign({}, error.params);
+  if (params.field) {
+    params.field = t("field." + params.field);
+  }
+  return t("error." + error.code, params);
 }
 
 function renderEmpty() {
@@ -189,10 +203,10 @@ function renderEmpty() {
 
 function renderResult(result) {
   statWeight.textContent = numberFormat.format(result.totalKg / 1000) + " t";
-  statPieces.textContent = result.totalPieces.toLocaleString("en-US") + " pcs";
+  statPieces.textContent = t("stat.piecesValue", { n: result.totalPieces.toLocaleString("en-US") });
   const alt = document.createElement("span");
   alt.className = "stat-sub";
-  alt.textContent = "or " + result.containers40 + " × 40′";
+  alt.textContent = t("stat.containersAlt", { n: result.containers40 });
   statContainers.replaceChildren(result.containers20 + " × 20′", alt);
   downloadButton.disabled = false;
 
@@ -200,7 +214,7 @@ function renderResult(result) {
     const row = document.createElement("tr");
     const nameCell = document.createElement("td");
     const name = document.createElement("span");
-    name.textContent = item.name;
+    name.textContent = itemName(item);
     nameCell.append(name);
     if (item.code) {
       const code = document.createElement("span");
@@ -208,13 +222,13 @@ function renderResult(result) {
       code.textContent = item.code;
       nameCell.append(code);
     }
-    const specCell = cell(item.spec);
+    const specCell = cell(itemSpec(item));
     if (item.custom) {
-      specCell.append(badge("custom", "Custom size"));
+      specCell.append(badge("custom", t("badge.custom")));
     }
     const weightCell = cell(numberFormat.format(item.totalKg), "num");
     if (item.weightSource === "estimate") {
-      weightCell.append(badge("est", "est."));
+      weightCell.append(badge("est", t("badge.est")));
     }
     row.append(nameCell, specCell, cell(item.qty.toLocaleString("en-US"), "num"), weightCell);
     return row;
@@ -225,10 +239,10 @@ function renderResult(result) {
 
   const legend = [];
   if (result.hasEstimates) {
-    legend.push("“est.” = unit weight not listed in the catalog; estimated from similar components.");
+    legend.push(t("legend.est"));
   }
   if (result.hasCustom) {
-    legend.push("“Custom size” = not a standard catalog size for this bay length; available on request.");
+    legend.push(t("legend.custom"));
   }
   bomLegend.textContent = legend.join(" ");
   bomLegend.hidden = legend.length === 0;
@@ -237,8 +251,13 @@ function renderResult(result) {
   if (result.system === "shoring") {
     drawShoring(result.geometry);
     const design = result.design;
-    designNote.textContent = stackText + " Design load " + design.loadKNm2 + " kN/m² → " + result.geometry.spacing.toFixed(1) +
-      " m horizontals, about " + design.legLoadKN + " kN per vertical (" + design.utilization + "% of the assumed " + design.allowableLegKN + " kN capacity).";
+    designNote.textContent = stackText + " " + t("design.note", {
+      load: design.loadKNm2,
+      spacing: result.geometry.spacing.toFixed(1),
+      leg: design.legLoadKN,
+      util: design.utilization,
+      allow: design.allowableLegKN
+    });
   } else {
     drawFacade(result.geometry);
     designNote.textContent = stackText;
@@ -249,9 +268,23 @@ function renderResult(result) {
 // 每個立柱位置使用的規格品立柱組合，例如 3.0 + 3.0 + 1.5 m + Jack Base 0.5 m = 8 m。
 function describeVerticalStack(stack, system) {
   const pieces = stack.sequence.map(function (len) { return len.toFixed(1); }).join(" + ");
-  const jacks = system === "shoring" ? "Basic Socket 0.2 m + jacks " : "Jack Base ";
-  return "Each vertical line (bottom → top): " + pieces + " m verticals + " + jacks + formatMeters(stack.extension) +
-    " = " + formatMeters(stack.topHeight) + ".";
+  return t("stack.line", {
+    pieces: pieces,
+    jacks: t(system === "shoring" ? "stack.jackShoring" : "stack.jackFacade"),
+    ext: formatMeters(stack.extension),
+    top: formatMeters(stack.topHeight)
+  });
+}
+
+// 構件名稱與規格中的字詞依目前語言顯示（例如 Vertical → 主架）。
+function itemName(item) {
+  return i18n.term("item", item.name);
+}
+
+function itemSpec(item) {
+  return item.spec.replace(/Aluminum|Site specific/g, function (word) {
+    return i18n.term("spec", word);
+  });
 }
 
 function badge(className, text) {
@@ -321,19 +354,17 @@ function drawFacade(g) {
   }
   diagram.replaceChildren.apply(diagram, parts);
 
-  let text = "Elevation: " + g.fullBays + " × " + formatMeters(g.bayLength);
-  g.fillers.forEach(function (len) {
-    text += " + " + formatMeters(len);
+  diagramCaption.textContent = t("caption.facade", {
+    full: g.fullBays,
+    bay: formatMeters(g.bayLength),
+    fillers: g.fillers.map(function (len) { return " + " + formatMeters(len); }).join(""),
+    shade: fillerCount ? t(fillerCount > 1 ? "caption.shadeMany" : "caption.shadeOne") : "",
+    covered: formatMeters(g.coveredLength),
+    lifts: g.lifts,
+    lift: formatMeters(g.liftHeight),
+    levels: g.levels,
+    clip: g.fullBays > drawnFull ? t("caption.clipFacade", { n: drawnFull }) : ""
   });
-  if (fillerCount) {
-    text += " (filler bay" + (fillerCount > 1 ? "s" : "") + " shaded)";
-  }
-  text += " = " + formatMeters(g.coveredLength) + ", " + g.lifts + " lifts × " + g.liftHeight.toFixed(1) +
-    " m, " + g.levels + " decked level(s)";
-  if (g.fullBays > drawnFull) {
-    text += " (" + drawnFull + " full bays drawn)";
-  }
-  diagramCaption.textContent = text + ".";
 }
 
 // 支撐架平面圖：立柱格點與兩向橫桿。
@@ -361,16 +392,20 @@ function drawShoring(g) {
   }
   diagram.replaceChildren.apply(diagram, parts);
 
-  const clipped = g.nx > MAX_DRAWN || g.ny > MAX_DRAWN ? " (partly shown)" : "";
-  diagramCaption.textContent = "Plan: " + g.nx + " × " + g.ny + " verticals at " + g.spacing.toFixed(1) + " m spacing, " +
-    g.lifts + " lifts" + clipped + ".";
+  diagramCaption.textContent = t("caption.shoring", {
+    nx: g.nx,
+    ny: g.ny,
+    spacing: formatMeters(g.spacing),
+    lifts: g.lifts,
+    clip: g.nx > MAX_DRAWN || g.ny > MAX_DRAWN ? t("caption.clipShoring") : ""
+  });
 }
 
 function downloadCsv() {
   if (!currentResult) {
     return;
   }
-  const blob = new Blob(["﻿" + calc.toCsv(currentResult)], { type: "text/csv;charset=utf-8" });
+  const blob = new Blob(["﻿" + buildCsv(currentResult)], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -379,6 +414,24 @@ function downloadCsv() {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+// 料表 CSV：表頭、品名與規格字詞依目前語言輸出。
+function buildCsv(result) {
+  const rows = [[t("csv.code"), t("csv.item"), t("csv.spec"), t("csv.qty"), t("csv.unit"), t("csv.total"),
+    t("csv.source"), t("csv.standard")]];
+  result.items.forEach(function (item) {
+    rows.push([item.code, itemName(item), itemSpec(item), item.qty, item.unitKg, item.totalKg,
+      t(item.weightSource === "estimate" ? "csv.estimated" : "csv.catalog"),
+      t(item.custom ? "csv.custom" : "csv.standardValue")]);
+  });
+  rows.push(["", t("csv.sum"), "", result.totalPieces, "", result.totalKg, "", ""]);
+  return rows.map(function (row) {
+    return row.map(function (value) {
+      const text = String(value);
+      return /[",\n]/.test(text) ? "\"" + text.replace(/"/g, "\"\"") + "\"" : text;
+    }).join(",");
+  }).join("\r\n");
 }
 
 function readRfq() {
@@ -401,16 +454,16 @@ function readRfq() {
 
 function validateRfq(rfq) {
   if (!rfq.company_name || !rfq.country || !rfq.contact_name || !rfq.email) {
-    return "Please fill in all required fields marked with *.";
+    return t("rfq.errRequired");
   }
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(rfq.email)) {
-    return "Please enter a valid email address.";
+    return t("rfq.errEmail");
   }
   if (!rfq.privacy_consent) {
-    return "Please agree to the use of your details so we can respond.";
+    return t("rfq.errConsent");
   }
   if (!currentResult) {
-    return "Please correct the project dimensions first.";
+    return t("rfq.errDimensions");
   }
   return "";
 }
@@ -440,12 +493,12 @@ function describeError(error) {
   const code = (error && error.code) || "";
   const text = String((error && error.message) || "");
   if (code === "23514" || code === "23502" || code === "22P02") {
-    return "Some details are not in the expected format. Please check the form and try again.";
+    return t("rfq.errFormat");
   }
   if (/fetch|network/i.test(text)) {
-    return "We could not reach the server. Please check your connection and try again.";
+    return t("rfq.errNetwork");
   }
-  return "Sorry, your request could not be sent. Please email us at " + FALLBACK_EMAIL + ".";
+  return t("rfq.errGeneric", { email: FALLBACK_EMAIL });
 }
 
 async function submitRfq(event) {
@@ -454,7 +507,7 @@ async function submitRfq(event) {
 
   // 隱藏欄位被填寫，多半是機器人；假裝成功但不送出。
   if (rfq.website) {
-    showMessage(rfqMessage, "Thank you! Our team will contact you soon.", "success");
+    showMessage(rfqMessage, t("rfq.thanks"), "success");
     rfqForm.reset();
     return;
   }
@@ -467,13 +520,13 @@ async function submitRfq(event) {
 
   if (!client || !navigator.onLine) {
     window.location.href = buildMailto(rfq);
-    const reason = navigator.onLine ? "Online submission is not configured yet" : "You are offline";
-    showMessage(rfqMessage, reason + ", so we opened an email draft to " + FALLBACK_EMAIL + " instead.", "info");
+    const reason = t(navigator.onLine ? "rfq.reasonNotConfigured" : "rfq.reasonOffline");
+    showMessage(rfqMessage, t("rfq.mailto", { reason: reason, email: FALLBACK_EMAIL }), "info");
     return;
   }
 
   rfqSubmit.disabled = true;
-  showMessage(rfqMessage, "Sending…", "info");
+  showMessage(rfqMessage, t("rfq.sending"), "info");
 
   const row = {
     company_name: rfq.company_name,
@@ -502,7 +555,7 @@ async function submitRfq(event) {
     showMessage(rfqMessage, describeError(response.error), "error");
     return;
   }
-  showMessage(rfqMessage, "Thank you! Your request has been sent. Our team will contact you soon.", "success");
+  showMessage(rfqMessage, t("rfq.sent"), "success");
   rfqForm.reset();
 }
 
@@ -567,6 +620,17 @@ function updateOnlineStatus() {
 
 window.addEventListener("online", updateOnlineStatus);
 window.addEventListener("offline", updateOnlineStatus);
+
+// ---- 語言切換 ----
+document.getElementById("lang-toggle").addEventListener("click", function () {
+  i18n.toggle();
+});
+i18n.onChange(function () {
+  // 重新產生所有動態文字；詢價表單上的提示訊息改語言後清除，避免中英混雜。
+  hideMessage(rfqMessage);
+  update();
+});
+i18n.apply();
 
 document.getElementById("placeholder-banner").hidden = !calc.DATA.isPlaceholder;
 updateOnlineStatus();
